@@ -1,3 +1,6 @@
+import java.nio.Buffer
+import java.security.PrivateKey
+
 /**
  * A "blind coin" is the information needed to spend a particular blind
  * commitment deposited in the blockchain.
@@ -18,13 +21,14 @@
  * fromDBOject() to generate a BlindCoin object after DB retreival.
  */
 
- class BlindCoin(auth_privkey,
-                value,                  
-                asset_id,               
-                blinding_factor,         
-                commitment,             
-                spent,                  
-                asking_pubkey = null    
+ class BlindCoin(
+                auth_privkey: PrivateKey,
+                value: Long,
+                asset_id: String,
+                blinding_factor: String,
+                commitment: Buffer,
+                spent: Buffer,
+                asking_pubkey: PublicKey? = null
 ){
      /**
      * Generally shouldn't be called directly.  New coin objects should

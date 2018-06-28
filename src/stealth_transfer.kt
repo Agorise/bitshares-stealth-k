@@ -4,7 +4,7 @@
 class Stealth_Transfer(FromID,ToID,asset,amount,transaction_type)
 {
     lateinit var from: StealthID?   // StealthID objects
-    lateinit var to: String         // ''
+    lateinit var to: Any         // ''
     lateinit var asset: Any?        //object, use get("id") to get 1.3.0
     lateinit var amount: Int        // in base units (ie 1.0 BTS = 100000)
     lateinit var transaction_type: Int
@@ -32,17 +32,11 @@ class Stealth_Transfer(FromID,ToID,asset,amount,transaction_type)
         var nonce = one_time_key.toBuffer() //256-its (d in Q=d*G)
         var blind_factor = hash.sha256(child)
         var amount = amount
-        //var amountasset = //<HERE> - Create data class to match:
-        /*{"amount":amount, "asset_id":this.asset.get("id")};*/
+        var amountasset = amountasset_dat(amount, null)
         total_amount += amount
         blinding_factors = arrayOf(blind_factor)
         var Sout = blind_output()
-        //out.owner = //<HERE> - Create data class to match:
-        /*
-        {"weight_threshold":1,"account_auths":[],
-                     "key_auths":[[to_key.child(child),1]],
-                     "address_auths":[]}
-        */
+        out.owner = owner_dat(1,null,arrayOf(to_key.child(child)),null)
         Sout.commitment = StealthZK.BlindCommit(blind_factor, amount) // <HERE> - Translate stealthZK
         Sout.range_proof = Uint8Array(0) <HERE> //Perhaps will fail in kotlin.
         var meta = blind_output_meta(); //Metadata for each output, to be kept in blindconf for our history/records.
@@ -58,10 +52,13 @@ class Stealth_Transfer(FromID,ToID,asset,amount,transaction_type)
         bop.amount = total_amount
         bop.blinding_factor = blind_factor// should be blind_sum but only one
         //Leftover from JS todo: bop.outputs needs to be sorted (if > 1 )
-        var tr = TransactionBuilder() // <HERE> This, or an alternative should exist in graphenej.
+
+        var tr = TransactionBuilder() // <HERE> This, or an alternative should exist in graphenej
         //Data classes or similar must be created for this since kotlin can't use undeclared objects.
         //Sending/Broadcasting and registering changes must also be discussed with the crystal team.
+
         /*Code to be discussed:
+
         let tr = new TransactionBuilder();
         tr.add_type_operation("transfer_to_blind",{
             fee: {
@@ -81,15 +78,15 @@ class Stealth_Transfer(FromID,ToID,asset,amount,transaction_type)
             // The ones I manually generate tho always fail with "Missing
             // Active Authority"
             return Promise.all([tr.set_required_fees(),tr.finalize()]).then(()=>{
-                /*** console.log ("Try'n catch a TX by the tail yo.");
-                /*** console.log(tr.expiration);
+                // console.log ("Try'n catch a TX by the tail yo.");
+                // console.log(tr.expiration);
                 tr.expiration+=600;
-                /*** console.log(tr.expiration);
+                // console.log(tr.expiration);
                 tr.add_signer(PrivateKey        // Try manually adding signing keys
                    .fromWif("5H***"));
                 tr.sign();//
                 blindconf.trx = tr;
-                /*** console.log(JSON.stringify(tr.serialize()));
+                // console.log(JSON.stringify(tr.serialize()));
                 return blindconf;});
         }//END SHUNT - Normal behavior follows...
         return WalletDb.process_transaction(tr,null,true)
@@ -99,11 +96,11 @@ class Stealth_Transfer(FromID,ToID,asset,amount,transaction_type)
                                  JSON.stringify(err));
             });
     }
-        */
+*/
     }
 
 
-    /**
+    /*
      *  Blind to Blind transfer.
      *
      *  If @to_temp_acct==true, then "to" authority is anonymous, and
@@ -112,8 +109,8 @@ class Stealth_Transfer(FromID,ToID,asset,amount,transaction_type)
      *  temp balance to a public account.  See Blind_to_Public().
      *
      *  TEMP CODE: At present, we spend ENTIRE receipt to single
-     *  output.  This will be fixed when we have range proofs.
-     */
+     *  output.  This will be fixed when we have range proofs.*/
+
     fun Blind_to_Blind(to_temp_acct: Boolean): Unit 
     {
         var bop: blind_transfer_op = blind_transfer_op()
@@ -136,81 +133,68 @@ class Stealth_Transfer(FromID,ToID,asset,amount,transaction_type)
             changeamount -= feeperoutput
             changeoutputneeded = true
         }
-        assert(CoinsIn.length > 0 && changeamount >= 0)
-        {"Insuficient spendable coins: ${(amount + totalfee)} needed; 
-          ${BlindCoin.valueSum(from.coins)} available; 
-          ${BlindCoin.valueSum(CoinsIn)} selected for use."}
-        //blindconf.consumed_commits.push <HERE> - Study a bit about arrays in kotlin for a better form.
-        // (..CoinsIn.map(a=>a.commitmentHex()))
-        //var feeamountasset = <HERE> - Data structure for :
-        /*
-            let feeamountasset
-            = {"amount":totalfee, "asset_id":this.asset.get("id")};
-            bop.fee = feeamountasset;
-        */
+        assert(CoinsIn.isNotEmpty() && changeamount >= 0)
+        {"Insuficient spendable coins: ${(amount + totalfee)} needed "
+          "${BlindCoin.valueSum(from.coins)} available"
+          "${BlindCoin.valueSum(CoinsIn)} selected for use."
+        }
+        for(i in 0 until CoinsIn.size) {
+            blindconf.consumed_commits.add(CoinsIn[i].commitmentHex())
+        }
+        var feeamountasset = ammountasset_dat(totalfee, asset.get("id"))
+        bop.fee = feeamountasset
         println("Tx amount: ${amount} Change back: ${changeamount} Fee: ${totalfee}")
-        //var Recipients = Array LIST//Data Class for :
-        /*Recipients[0] = {"label":this.to.label, "markedlabel":this.to.markedlabel,
-                         "amountdue":{"amount":this.amount,
-                                      "asset_id":this.asset.get("id")},
-                         "pubkey":this.to.pubkey
-                        };*/
+        var Recipients : MutableList<recipient_dat> = mutableListOf(recipient_dat(to.label, to.markedlabel,amountdue_dat(amount,asset.get.id),to.pubkey))
         if(changeoutputneeded)
         {
-            Recipients.add(/*Data class to be made*/)//<HERE>
-            /*
-                        {"label":this.to.label, "markedlabel":this.to.markedlabel,
-                         "amountdue":{"amount":this.amount,
-                                      "asset_id":this.asset.get("id")},
-                         "pubkey":this.to.pubkey
-                        };
-             */
+            Recipients.add(recipient_dat(to.label, to.markedlabel, amountdue_dat(amount,asset.get("id"))), to.pubkey)
         }
-        //var blind_factors_in = CoinsIn.map(a => a.blinding_factor)
+        var blind_factors_in : MutableList<String> = mutableListOf()
         var blind_factors_out = emptyArray<String>()
         var inputs = BlindCoin.getBlindInputsFromCoins(CoinsIn)
         bop.inputs = inputs;
-        for(i in Recipients.indexes)
+        for(i in 0 until Recipients.size)
         {
             var needrangeproof = (Recipients.length > 1)
             var needblindsum = (i == Recipients.length-1)
             var Recipient = Recipients[i]
 
-            var one_time_key = key.get_random_key();
-            var to_key = Recipient.pubkey;
+            var one_time_key = key.get_random_key()
+            var to_key = Recipient.pubkey
             var secret = one_time_key.get_shared_secret(to_key);  // 512-bits
-            var child = hash.sha256(secret);        // 256-bit pub/priv key offset
-            var nonce = one_time_key.toBuffer();    // 256-bits, (d in Q=d*G)
-            var blind_factor = hash.sha256(child);  // (unless blindsum needed)
+            var child = hash.sha256(secret)        // 256-bit pub/priv key offset
+            var nonce = one_time_key.toBuffer()    // 256-bits, (d in Q=d*G)
+            var blind_factor = hash.sha256(child)  // (unless blindsum needed)
             if (needblindsum) 
             {
                 blind_factor = StealthZK.BlindSum(blind_factors_in,
                                                   blind_factors_out);
             } else {
-                blind_factors_out.add(blind_factor);
+                blind_factors_out.add(blind_factor)
             }
-            var amount = Recipient.amountdue.amount;
-            /* <HERE> - Another amountasset data class needed. (or the same, we'll see)
-            var amountasset = {"amount":amount, "asset_id":this.asset.get("id")};
-                /*** console.log("Output " + (1+i) + " of " + Recipients.length
-                                + " to " + Recipient.markedlabel
-                                + "; amount = " + amount);
-            */
-            var sout = new blind_output;             // One output per recipient
-            var nullowner = to_temp_acct && (i===0);// To be claimed in op 41
-            /* <HERE> out.owner = data_class
-            {"weight_threshold":nullowner?0:1,
-                            "account_auths":[],
-                            "key_auths":nullowner?[]:[[to_key.child(child),1]],
-                            "address_auths":[]};
-            */
+            var amount = Recipient.amountdue.amount
+            var amountasset = amountasset_dat(amount, asset.get("id"))
+            println("Output ${1+i} of ${Recipients.size}")
+            println(" to ${Recipient.markedlabel}")
+            println("Amount = ${amount}")
+            var sout = blind_output();             // One output per recipient
+            var nullowner: Boolean = to_temp_acct && (i===0)// To be claimed in op 41
+            if(nullowner)
+            {
+                sout.owner = outOwner_dat(0, emptyArray<String?>(), emptyArray<key_auths_dat>(), emptyArray<Any>())
+            }
+            else
+            {
+                sout.owner = outOwner_dat(1, emptyArray<String?>(), arrayOf(key_auths_dat(to_key.child(child), 1)), emptyArray<Any>())
+            }
+
             sout.commitment = StealthZK.BlindCommit(blind_factor,amount)
             if(needrangeproof){sout.range_proof = RangeProof.SignValue(amount,blind_factor, nonce)}
             else{sout.range_proof = emptyArray<Int>()}
             var meta = new blind_output_meta()
             meta.label = Recipient.label
             meta.auth = sout.owner
-            meta.SetMemoData(amountasset, blind_factor, out.commitment);
+            meta.SetMemoData(amountasset, blind_factor, sout.commitment);
             meta.ComputeReceipt(secret);            // secret used as AES key/iv
             sout.stealth_memo = meta.confirmation;   // Omit??? (Serializer spits)
             blindconf.output_meta.add(meta);
@@ -239,17 +223,17 @@ class Stealth_Transfer(FromID,ToID,asset,amount,transaction_type)
         println("B2PUB: Stage 1 was ${stage1}")
         var bop = transfer_to_blind_op()
         var feeamount = feebase;
-        //var feeamountasset = <HERE> - Data Class needed for: {"amount":feeamount, "asset_id":this.asset.get("id")}
+        var feeamountasset = amountasset_dat(feeamount, asset.get("id"))
         bop.fee = feeamountasset;
         var input_memo = stage1.output_meta[0].decrypted_memo
         var input_auth = stage1.output_meta[0].auth
         //^^ Need to search rather than assume position zero.
         var amount = input_memo.amount.amount - feeamount
-        //amountasset = <HERE> - Data class needed for : {"amount":amount, "asset_id":this.asset.get("id")};
+        var amountasset = amountasset_dat(amount, asset.get("id"))
         bop.amount = amountasset;
         bop.to = to.id
         bop.blinding_factor = input_memo.blinding_factor
-        //bop.inputs = arrayOf(<HERE> - Data class needed for: {"commitment":input_memo.commitment,"owner":input_auth})
+        bop.inputs = arrayOf(bopInputs_dat(input_memo.commitment, input_auth))
         println("BOP: ${bop}")
         //<HERE> - Transaction builder etc. discuss with team.
     }

@@ -16,22 +16,25 @@ class BlindFees()
     var unblind: Array<Int> = arrayOf(100)
     var chainid: String = "Not_Implemented_Yet."
     var fees: BlindFees = BlindFees()
-    //GET CHAIN ID <HERE>
-    if(chainid.compareTo("4018d784") == 0)
+
+    //GET CHAIN ID TODO: <HERE>
+    init
     {
-        println("Using blind fee structure for main net 4018d784")
-        // TODO: Still need to get thse fees *properly* (and also check
-        // for lifetime member status which reduces fees.)
-        blindfees = arrayOf(500000, 0, 500000); // Base, per-input, per-output
-        unblind = arrayOf(254933); 
-    }
-    if(chainid.compareTo("9cf6f255"))
-    {
-        /***/ println("Using blind fee structure for Agorise pre-alpha test net 9cf6f255.")
-            // TODO: Still need to get thse fees *properly* (and also check
-            // for lifetime member status which reduces fees.)
-            this.blindfees = [500000, 0, 500000] // Base, per-input, per-output
-            this.unblind = [500000]           // Cost to unblind a commitment
+            if (chainid.compareTo("4018d784") == 0) {
+                println("Using blind fee structure for main net 4018d784")
+                // TODO: Still need to get thse fees *properly* (and also check
+                // for lifetime member status which reduces fees.)
+                blindfees = arrayOf(500000, 0, 500000); // Base, per-input, per-output
+                unblind = arrayOf(254933);
+            }
+            if (chainid.compareTo("9cf6f255")==0) {
+                /***/
+                println("Using blind fee structure for Agorise pre-alpha test net 9cf6f255.")
+                // TODO: Still need to get thse fees *properly* (and also check
+                // for lifetime member status which reduces fees.)
+                this.blindfees = [500000, 0, 500000] // Base, per-input, per-output
+                this.unblind = [500000]           // Cost to unblind a commitment
+            }
         }
     }
 }
