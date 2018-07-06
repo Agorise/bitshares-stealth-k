@@ -1,5 +1,6 @@
 import java.nio.Buffer
 import java.security.PrivateKey
+import java.security.PublicKey
 
 /**
  * A "blind coin" is the information needed to spend a particular blind
@@ -22,13 +23,13 @@ import java.security.PrivateKey
  */
 
  class BlindCoin(
-                auth_privkey: PrivateKey,
-                value: Long,
-                asset_id: String,
-                blinding_factor: String,
-                commitment: Buffer,
-                spent: Buffer,
-                asking_pubkey: PublicKey? = null
+                var auth_privkey: Any?,
+                var value: Any?,
+                var asset_id: Any?,
+                var blinding_factor: ByteArray,
+                var commitment: ByteArray,
+                var spent: Buffer,
+                var asking_pubkey: PublicKey? = null
 ){
      /**
      * Generally shouldn't be called directly.  New coin objects should
@@ -42,15 +43,66 @@ import java.security.PrivateKey
                 spent,                  // true/false
                 asking_pubkey = null    // (Optional)
      */
-    lateinit var auth_privkey: Any?
     init
     {
         if(auth_privkey is String)
         {auth_privkey=PrivateKey.fromWif(auth_privkey)}
-        else{auth_privkey=auth_privkey}
         if(value is String)
-        {value = }
-        else{}
+        {
+            var x: String = value as String
+            var y: Long = x.toLong()
+            value = y }
+        if(asset_id !is String)
+        {   var x = asset_id as Int
+            var y:String = "1.3."+asset_id
+            asset_id = y }
+        if(asking_pubkey is String)
+        {
+            var x = asking_pubkey as String
+            var y = PublicKey.fromStringOrThrow(asking_pubkey)
+            asking_pubkey = y
+        }
+    }
+    /**
+     * Returns the "asking address" which was used to request the funds
+     * contained by the coin.  String value, eg, "BTSxxxx..."
+     */
+    fun ask_address(): String { return asking_pubkey.toString() }
+    fun valueString(): String { return value.toString()}
+    fun commitmentHex(): String {return commitment.toHex()}
+    fun blindingFactorHex(): String{ return blinding_factor.toHex()}
+    /**
+     * Gets a "blind coin" from a base58-encoded receipt if a private key
+     * needed to decode the receipt can be found.  See also fromReceipts()
+     * for a version that returns an array from a comma-separated list of
+     * receipts.
+     *
+     * @arg rcpt_txt      - Receipt as base58 text
+     * @arg DB            - Stealth DB from which wif can be querried,
+     *                      or else explicit wif as string
+     *
+     * returns: false || new BlindCoin(...)
+     *
+     * returns false if wallet contains no private key that can decode the
+     *         receipt, or else a BlindCoin object if receipt is
+     *         successfully decoded.
+     *
+     * NOTE: This does NOT check whether the commitment is in fact present
+     * and unspent in the blockchain, but only returns the info from the
+     * receipt.  Checking for spendability should only be done when updating
+     * balance displayed to the user and before contructing a blind spend
+     * operation in order to avoid unnecessarily revealing our "interest" in
+     * the particular commitment to the p2p network.
+     */
+    fun fromReceipt(receipt_txt: String, DB: Any?) : Unit
+    {
+        var confirmation = stealth_confirmation()
+        confirmation.ReadBase58(receipt_txt)
+        var askingwif: Boolean = false;
+        if(DB !is String)
+        {
+            askingwif = DB.PrivKeyFinder(confirmation.to.toString())
+        }
     }
 
  }

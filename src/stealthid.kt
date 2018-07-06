@@ -1,5 +1,3 @@
-data class Privkeyobject(val key: String)//todo
-data class Pubkeyobj(val key: String) //todo
 data class CAccount(val key: String) //todo
 /**
  *  This class is a wrapper class around account/contact classes of
@@ -26,8 +24,8 @@ class StealthID(label_or_account: Any, pubkeyobj: Any?, privkeyobject: Any?)
     var label: Any = false;
     var account: Any = false;
     var markedlabel: Any = false;
-    lateinit var pubkey: Any?;
-    lateinit var privkey: Any?;
+    lateinit var PublicKey: Any?;
+    lateinit var PrivateKey: Any?;
     var isblind: Boolean = false;
     lateinit var id: Any;
     lateinit var coins: Array <BlindCoin>;
@@ -37,9 +35,9 @@ class StealthID(label_or_account: Any, pubkeyobj: Any?, privkeyobject: Any?)
         {
             label = label_or_account
             markedlabel = "@"+label
-            if(privkey != null){ pubkey = privkey.toPublicKey()}
-            else{pubkey = pubkeyobj}
-            privkey = privkeyobj //may be null or undefined
+            if(PrivateKey != null){ PublicKey = PrivateKey.toPublicKey()}
+            else{PublicKey = pubkeyobj}
+            privkey = PrivateKey //may be null or undefined
             isblind = true
         }
         else if(label_or_account is CAccount)
