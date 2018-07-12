@@ -1,5 +1,6 @@
 import jdk.nashorn.internal.objects.NativeUint8Array
-
+import cy.agorise.graphenej.Address
+import org.bitcoinj.core.ECKey
 /** confidential.kt
  *
  *  Classes and structs to represent components of confidential
@@ -24,24 +25,25 @@ import jdk.nashorn.internal.objects.NativeUint8Array
  */
 class stealth_confirmation()
 {
-    var one_time_key: PublicKey? = null
-    var to: PublicKey? = null
+    var one_time_key: String? = null
+    var to: String? = null
     var encrypted_memo: Any? = null
 
     /* This sets the key fields, both should be public keys.
     *
     **/
-    fun SetPubKeys(One_Time: PublicKey, To_Key: PublicKey)
+    fun SetPubKeys(One_Time: Address, To_Key: Address)
     {
-        one_time_key = One_Time
-        to = To_Key
+        one_time_key = One_Time.publicKey.address
+        to = To_Key.publicKey.address
     }
     /**
      *  Serialize and express as base58 string. //Todo: This is definitely Not finished.
      */
     fun Base58(): String
     {
-        return bs58.encode(Serializer.stealth_confirmation.toBuffer() //TODO: Find appropriate b58 module. also java serializer.
+
+        return base58.encode(Serializer.stealth_confirmation.toBuffer()) //TODO: Find appropriate b58 module. also java serializer.
     }
     fun ReadBase58(rcpt_txt)
     {
@@ -86,8 +88,9 @@ class stealth_cx_memo_data()
      *         think), used to initialize key and iv of the aes
      *         encoder.
      */
-    fun EncryptWithSecret(seccret: Any?): ByteArray//Todo: Aescoder..
+    fun EncryptWithSecret(secret: Any?): ByteArray//Todo: Aescoder..
     {
+        var aescoder = AesCrypt()
         var aescoder: Any? = Aes.fromSha512(secret.toString("hex"))
         var memo_data_flat: ByteArray = Serializer.stealth_memo_data.toBuffer(this)
         var retval: ByteArray = aescoder.encrypt(memo_data_flat)
@@ -121,7 +124,7 @@ class stealth_cx_memo_data()
 class blind_output_meta()
 {
     var label:String = ""
-    var pub_key: PublicKey? = null
+    var pub_key: String? = null
     var decrypted_memo = stealth_cx_memo_data()
     var confirmation = stealth_confirmation()
     var auth: Any? = null
@@ -134,9 +137,10 @@ class blind_output_meta()
      */
     fun SetKeys(one_time: Any?, to_key: Any?) : Unit
     {
-        if(one_time.constructor.name.equals("PrivateKey", true))
+        if(one_time is PrivateKey)
         {
-            one_time = one_time.toPublicKey() //Drop Private info.
+            var x = one_time as PrivateKey
+            one_time = Address(x.key) //Drop Private info.
         }
         this.pub_key = to_key
         this.confirmation.SetPubKeys(one_time, to_key)
@@ -157,7 +161,7 @@ class blind_output_meta()
      */
     fun ComputeReceipt(secret: ByteArray): Unit
     {
-        var check32 = (NativeUint8Array(secret.slice(0,4),0,1)[0])
+        var check32 = (NativeUint8Array(secret.slice(0, 4),0,1)[0])
         this.decrypted_memo.check = check32 as Boolean
         this.confirmation.encrypted_memo = this.decrypted_memo.EncryptWithSecret(secret)
         this.confirmation_receipt = this.confirmation.Base58()
@@ -174,7 +178,7 @@ class blind_confirmation()
 {
     var output_meta: MutableList<blind_output_meta> = mutableListOf()
     var consumed_comits: MutableList<String> = mutableListOf()
-    var trx = //Todo: Transaction_Builder discussion with team
+    //var trx = //Todo: Transaction_Builder discussion with team
 }
 /**
  *  Represents a blind output (somewhat like a Bitcoin UTXO).  A blind
@@ -189,7 +193,7 @@ class blind_confirmation()
  */
 class blind_output()
 {
-    var comitment: String = ""
+    var commitment: String = ""
     var range_proof: String = ""
     var owner: Any? = null
     var stealth_memo = stealth_confirmation()

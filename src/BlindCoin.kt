@@ -1,6 +1,9 @@
+import cy.agorise.graphenej.Address
 import java.nio.Buffer
-import java.security.PrivateKey
-import java.security.PublicKey
+import org.bitcoinj.core.ECKey
+import cy.agorise.graphenej.PublicKey
+import org.bitcoinj.core.DumpedPrivateKey
+import java.math.BigInteger
 
 /**
  * A "blind coin" is the information needed to spend a particular blind
@@ -21,7 +24,6 @@ import java.security.PublicKey
  * BlindCoin object for storage/retreival.  There is a corresponding static
  * fromDBOject() to generate a BlindCoin object after DB retreival.
  */
-
  class BlindCoin(
                 var auth_privkey: Any?,
                 var value: Any?,
@@ -29,7 +31,7 @@ import java.security.PublicKey
                 var blinding_factor: ByteArray,
                 var commitment: ByteArray,
                 var spent: Buffer,
-                var asking_pubkey: PublicKey? = null
+                var asking_pubkey: Any? = null
 ){
      /**
      * Generally shouldn't be called directly.  New coin objects should
@@ -46,8 +48,11 @@ import java.security.PublicKey
     init
     {
         if(auth_privkey is String)
-        {auth_privkey=PrivateKey.fromWif(auth_privkey)}
-        if(value is String)
+        {
+            var x = auth_privkey
+            auth_privkey = PrivateKey.fromWif(x as String)
+        }
+        if(value is String) //Todo : <Here> Polish this init for tsafety
         {
             var x: String = value as String
             var y: Long = x.toLong()
@@ -59,8 +64,9 @@ import java.security.PublicKey
         if(asking_pubkey is String)
         {
             var x = asking_pubkey as String
-            var y = PublicKey.fromStringOrThrow(asking_pubkey)
-            asking_pubkey = y
+            //var y = PublicKey.fromStringOrThrow(asking_pubkey)
+            var y = asking_pubkey
+            asking_pubkey = Address(y as String).publicKey.key
         }
     }
     /**

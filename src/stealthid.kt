@@ -1,4 +1,8 @@
-data class CAccount(val key: String) //todo
+import cy.agorise.graphenej.Address
+import cy.agorise.graphenej.PublicKey
+import org.bitcoinj.core.ECKey
+
+data class CAccount(val name: String, val id: String)
 /**
  *  This class is a wrapper class around account/contact classes of
  *  heterogeneous type. It provides uniform access no matter if we are
@@ -11,7 +15,7 @@ data class CAccount(val key: String) //todo
  *  for a CREDENTIALED account (one we can spend FROM) or ANY
  *  account/contact (one we can spend TO).
  */
-class StealthID(label_or_account: Any, pubkeyobj: Any?, privkeyobject: Any?)
+class StealthID(label_or_account: Any, pubkeyobj: Any?, privkeyobject: ECKey?)
 {
     /**
      * Don't call directly.  Use the finder functions.
@@ -20,13 +24,12 @@ class StealthID(label_or_account: Any, pubkeyobj: Any?, privkeyobject: Any?)
      *          contact, and subsequent args will/may be set.  If not string,
      *          then assume a ChainStore Account object for a PUBLIC account.
      */
-    constr
-    var label: Any = false;
-    var account: Any = false;
-    var markedlabel: Any = false;
-    lateinit var PublicKey: Any?;
-    lateinit var PrivateKey: Any?;
-    var isblind: Boolean = false;
+    var label: Any = false
+    var account: Any = false
+    var markedlabel: Any = false
+    var PublicKey: PublicKey? = null
+    var PrivateKey: ECKey? = null
+    var isblind: Boolean = false
     lateinit var id: Any;
     lateinit var coins: Array <BlindCoin>;
     init
@@ -35,17 +38,23 @@ class StealthID(label_or_account: Any, pubkeyobj: Any?, privkeyobject: Any?)
         {
             label = label_or_account
             markedlabel = "@"+label
-            if(PrivateKey != null){ PublicKey = PrivateKey.toPublicKey()}
-            else{PublicKey = pubkeyobj}
-            privkey = PrivateKey //may be null or undefined
+            if(PrivateKey != null)
+            {
+                var xtempk = PrivateKey
+                var xtemp =ECKey.fromPublicOnly(xtempk?.pubKey)
+                PublicKey = PublicKey(xtemp)
+            }
+            else{PublicKey = pubkeyobj as PublicKey}
+            PrivateKey = privkeyobject //may be null or undefined
             isblind = true
         }
         else if(label_or_account is CAccount)
         {
             account = label_or_account
-            label = account.get("name")
+            var acc = account
+            label = (acc as CAccount).name
             markedlabel = label
-            id = account.get("id")
+            id = acc.id
             isblind = false;
         }
         else 
@@ -56,7 +65,7 @@ class StealthID(label_or_account: Any, pubkeyobj: Any?, privkeyobject: Any?)
 
     fun canBlindSpend(): Boolean 
     {
-        if(privkey != null)
+        if(PrivateKey != null)
         {
             return true
         }
@@ -64,11 +73,12 @@ class StealthID(label_or_account: Any, pubkeyobj: Any?, privkeyobject: Any?)
     }
     fun isStealthLabel(labelstring: String): Boolean 
     {
-        return (labelstring.get(0).compareTo('@'))
+        if(labelstring.get(0).compareTo('@') == 0){return true}
+        return false
     }
     fun stripStealthMarker(labelstring: String) : String
     {
-        return (labelstring.subsequence(1,labelstring.length))
+        return (labelstring.subSequence(1,labelstring.length).toString())
     }
     /**
      * Sets the list of BlindCoin's for a StealthID.  Input can be a
@@ -79,29 +89,29 @@ class StealthID(label_or_account: Any, pubkeyobj: Any?, privkeyobject: Any?)
      fun setCoins(input: Any)
      {
         if(input is BlindCoin){coins = arrayOf(input)}
-        else if(input is Array <BlindCoin>) {coins = input} //Not done need to fix it it won't work. <HERE>
+        else if(input is Array<BlindCoin>) {coins = input} //Not done need to fix it it won't work. <HERE>
         else{throw(Exception("Invalid Input: Can only pass a BlindCoin or an array of BlindCoins to setCoins()."))}
      }
      fun findCredentialed(label: String, DB: Any): StealthID
      {
-         if(StealthID.isStealthLabel(Label: String))
+         if(isStealthLabel(label))
          {
             // Find Stealth ACCOUNT by name:
             // TODO Rely on functions already in Database
             var accounts = DB.accounts
-            var namelabel = StealthID.StripStealthMarker(label)
-            for(for i:Int in accounts.indices)
+            var namelabel = stripStealthMarker(label)
+            for( i:Int in accounts.indices)
             {
                 if(accounts[i].label.compareTo(namelabel) == 0)
                 {
-                    var foundID = new StealthID(
+                    var foundID = StealthID(
                         namelabel,
-                        PublicKey.fromStringOrThrow(accounts[i].publickey)
-                        PrivateKey.fromWIF(accounts[i].privatekey)
+                        ECKey.fromPublicOnly(Address(accounts[i].publickey).pubkey)
+                        PrivateKey.fromWIF(accounts[i].privatekey))
                     var coins = DB.GetUnspentCoins(foundID.label)
                     foundID.setCoins(coins)
                     return foundID
-                    )
+
                 }
             }
             throw(Exception("Couldn't find $namelabel in stealth accounts."))
@@ -120,23 +130,24 @@ class StealthID(label_or_account: Any, pubkeyobj: Any?, privkeyobject: Any?)
              throw(Exception("Could not find name in regular accounts!"))
          }
      }
-     fun findAny(label: String, DB): StealthID
+     fun findAny(label: String, DB: Database): StealthID
      {
          try
          {
-             return StealthID.findCredentialed(label, DB)
+             return findCredentialed(label, DB)
          }
-         catch
+         catch(x)
          {
-             if(StealthID.isStealthLabel(label))
+             if(isStealthLabel(label))
              {
                  val contacts = DB.contacts
-                 val namelabel = StealthID.stripStealthMarker(label)
+                 val namelabel = stripStealthMarker(label)
                  for(i in contacts.indices)
                  {
                      if(contacts[i].label.compareTo(namelabel) == 0)
                      {
-                         return StealthID(namelabel, PublicKey.fromStringOrThrow(contacts[i].publickey))
+                         var key = ECKey.fromPublicOnly(Address(contacts[i].publickey as String).publicKey.key.pubKeyPoint)
+                         return StealthID(namelabel, key, null)
                      }
                  }
                  throw(Exception("Stealth Contact Not Found"))

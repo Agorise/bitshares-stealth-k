@@ -1,14 +1,25 @@
 /**<Here>-Restructure after classes are done. (Shouldn't be with lateinit.)
  *  Wraps up a stealth transfer in a convenient class.
  */
+import cy.agorise.graphenej.Address
+import cy.agorise.graphenej.PublicKey
+import jdk.nashorn.internal.objects.NativeUint8Array
+import org.bitcoinj.core.ECKey
+import org.bouncycastle.crypto.AsymmetricCipherKeyPair
+import org.bouncycastle.crypto.params.AsymmetricKeyParameter
+import org.bouncycastle.crypto.tls.HashAlgorithm.sha256
+import org.bouncycastle.crypto.util.SubjectPublicKeyInfoFactory
+import java.security.MessageDigest
+import javax.crypto.KeyAgreement
+
 class Stealth_Transfer(FromID,ToID,asset,amount,transaction_type)
 {
-    lateinit var from: StealthID?   // StealthID objects
-    lateinit var to: Any         // ''
+    lateinit var from: StealthID   // StealthID objects
+    lateinit var to: StealthID     // ''
     lateinit var asset: Any?        //object, use get("id") to get 1.3.0
     lateinit var amount: Int        // in base units (ie 1.0 BTS = 100000)
     lateinit var transaction_type: Int
-    lateinit var fees: Any? //Todo, Blindfees!!!! <HERE>
+    lateinit var fees: BlindFees? //Todo, Blindfees!!!! <HERE>
     init
     {
         from= FromID
@@ -25,28 +36,28 @@ class Stealth_Transfer(FromID,ToID,asset,amount,transaction_type)
         //blindconf(aparently never used)
         var total_amount = 0;
         //Loop over recepients (right now only support one.)
-        var one_time_key = key.get_random_key() // <HERE> - will need to mimic this somehow.
-        var to_key = to.pubkey;
-        var secret = one_time_key.get_shared_secret(to_key) //512-bits
-        var child = hash.sha256(secret) // 256-bit pub/priv key offset <HERE> another mimic
-        var nonce = one_time_key.toBuffer() //256-its (d in Q=d*G)
-        var blind_factor = hash.sha256(child)
+        var one_time_key = ECKey()//key.get_random_key() // <HERE> - will need to mimic this somehow.
+        var to_key = to.PublicKey//to.pubkey;
+        var secret = from.PublicKey?.key?.pubKeyPoint?.multiply(from.PrivateKey?.privKey)?.normalize()?.xCoord?.encoded
+        var child = MessageDigest.getInstance("SHA-256").digest(secret) // 256-bit pub/priv key offset <HERE> another mimic
+        var nonce = one_time_key.privKey.toByteArray() //256-its (d in Q=d*G)
+        var blind_factor = MessageDigest.getInstance("SHA-256").digest(child)
         var amount = amount
         var amountasset = amountasset_dat(amount, null)
         total_amount += amount
-        blinding_factors = arrayOf(blind_factor)
+        var blinding_factors = arrayOf(blind_factor)
         var Sout = blind_output()
-        out.owner = owner_dat(1,null,arrayOf(to_key.child(child)),null)
+        Sout.owner = owner_dat(1,null,arrayOf(to_key.child(child)),null)
         Sout.commitment = StealthZK.BlindCommit(blind_factor, amount) // <HERE> - Translate stealthZK
-        Sout.range_proof = Uint8Array(0) <HERE> //Perhaps will fail in kotlin.
+        Sout.range_proof = NativeUint8Array()// Todo: Requires zk analysis
         var meta = blind_output_meta(); //Metadata for each output, to be kept in blindconf for our history/records.
         meta.label = to.label;
         meta.SetKeys(one_time_key, to_key)
-        meta.SetMemoData(ammountasset, blind_factor, Sout.commitment)
+        meta.SetMemoData(amountasset, blind_factor, Sout.commitment)
         meta.ComputeReceipt(secret)
         Sout.stealth_memo = meta.confirmation //Omit? Serializer barfs
-        blindconf.output_meta = arrayof(meta)
-        bop.outputs = arrayOf(out)
+        blindconf.output_meta = mutableListOf(meta)
+        bop.outputs = mutableListOf(Sout)
         println("Receipt: ${meta.confirmation_receipt}")
         bop.from = from.id
         bop.amount = total_amount
@@ -115,21 +126,21 @@ class Stealth_Transfer(FromID,ToID,asset,amount,transaction_type)
     {
         var bop: blind_transfer_op = blind_transfer_op()
         var blindconf: blind_confirmation = blind_confirmation()
-        var feebase: Any? = fees.blindfees[0]
-        var feeperinput: Any? = fees.blindfees[1]
-        var feeperoutput: Any? = fees.blindfees[2]
+        var feebase: Any? = (fees!!.blindfees)[0]
+        var feeperinput: Any? = (fees!!.blindfees)[1]
+        var feeperoutput: Any? = (fees!!.blindfees)[2]
 
         var CoinsIn: Array<BlindCoin> = BlindCoin.getCoinsSatisfyingAmount(
             from.coins, 
-            (amount+feebase), 
+            (amount + feebase as Int),
             feeperinput, 
             feeperoutput)
-        var totalfee = feebase + feeperoutput + feeperinput * CoinsIn.length
-        var changeamount = BlindCoin.valueSum(CoinsIn - this.amount - totalfee)
+        var totalfee = feebase as Int + feeperoutput as Int + feeperinput as Int * CoinsIn.size
+        var changeamount = BlindCoin.valueSum(CoinsIn.size - this.amount - totalfee)
         var changeoutputneeded = false
         if(changeamount > 0)
         {
-            totalfee+=feeperoutput
+            totalfee += feeperoutput
             changeamount -= feeperoutput
             changeoutputneeded = true
         }
@@ -155,16 +166,17 @@ class Stealth_Transfer(FromID,ToID,asset,amount,transaction_type)
         bop.inputs = inputs;
         for(i in 0 until Recipients.size)
         {
-            var needrangeproof = (Recipients.length > 1)
-            var needblindsum = (i == Recipients.length-1)
+            var needrangeproof = (Recipients.size > 1)
+            var needblindsum = (i == Recipients.size-1)
             var Recipient = Recipients[i]
 
-            var one_time_key = key.get_random_key()
-            var to_key = Recipient.pubkey
-            var secret = one_time_key.get_shared_secret(to_key);  // 512-bits
-            var child = hash.sha256(secret)        // 256-bit pub/priv key offset
-            var nonce = one_time_key.toBuffer()    // 256-bits, (d in Q=d*G)
-            var blind_factor = hash.sha256(child)  // (unless blindsum needed)
+            var one_time_key = ECKey()
+            var to_key = Address(Recipient.pubkey).publicKey
+            var secret: ByteArray = to_key.key.pubKeyPoint.multiply(one_time_key.privKey).normalize().xCoord.encoded
+            //^^var secret = one_time_key.get_shared_secret(to_key);  // 512-bits
+            var child = MessageDigest.getInstance("SHA-256").digest(secret)        // 256-bit pub/priv key offset
+            var nonce = one_time_key.privKey    // 256-bits, (d in Q=d*G)
+            var blind_factor = MessageDigest.getInstance("SHA-256").digest(child)  // (unless blindsum needed)
             if (needblindsum) 
             {
                 blind_factor = StealthZK.BlindSum(blind_factors_in,
@@ -177,7 +189,7 @@ class Stealth_Transfer(FromID,ToID,asset,amount,transaction_type)
             println("Output ${1+i} of ${Recipients.size}")
             println(" to ${Recipient.markedlabel}")
             println("Amount = ${amount}")
-            var sout = blind_output();             // One output per recipient
+            var sout = blind_output()             // One output per recipient
             var nullowner: Boolean = to_temp_acct && (i===0)// To be claimed in op 41
             if(nullowner)
             {
@@ -214,11 +226,11 @@ class Stealth_Transfer(FromID,ToID,asset,amount,transaction_type)
     */
     fun Blind_To_Public(): Unit
     {
-        var feebase = fees.unblind[0]
+        var feebase = fees!!.unblind[0]
         var whoto = to
         to = from
         amount += feebase
-        var stage1 = Blind_to_Blind(true);
+        var stage1 = Blind_to_Blind(true)
         to = whoto
         println("B2PUB: Stage 1 was ${stage1}")
         var bop = transfer_to_blind_op()

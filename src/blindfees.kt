@@ -10,6 +10,7 @@
  * TODO: work out how to query blockchain for fees.  Shouldn't be
  * difficult.
  */
+
 class BlindFees()
 {
     var blindfees: Array<Int> = arrayOf(100, 0, 500000)
@@ -35,6 +36,5 @@ class BlindFees()
                 blindfees = arrayOf(500000, 0, 500000) // Base, per-input, per-output
                 unblind = arrayOf(500000)           // Cost to unblind a commitment
             }
-        }
     }
 }
