@@ -1,4 +1,5 @@
-# graphenek
-Graphene for Kotlin
+# Bitshares-Stealth-K
+Bitshares Stealth for Kotlin
 A module designed to neatly form blind/stealth transactions.
-Status: PseudoCode (Shouldn't even be used as a source of information yet.)
+Status: Unusable yet.
+Requires serialization, stealthzk & db connection.
