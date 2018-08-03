@@ -1,9 +1,11 @@
+import org.bouncycastle.jce.interfaces.ECKey
+
 /*{"weight_threshold":1,"account_auths":[],
     "key_auths":[[to_key.child(child),1]],
     "address_auths":[]}*/
 data class owner_dat(var weight_treshold: Int,
                  var account_auths: Array<String?>?,
-                 var key_auths: Array<PublicKey?>,
+                 var key_auths: Array<ECKey?>,
                  var address_auth: Array<Any?>)
 //var amountasset = //<HERE> - Create data class to match:
 /*{"amount":amount, "asset_id":this.asset.get("id")};*/

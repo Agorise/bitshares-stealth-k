@@ -203,7 +203,7 @@ class Stealth_Transfer(FromID,ToID,asset,amount,transaction_type)
             sout.commitment = StealthZK.BlindCommit(blind_factor,amount)
             if(needrangeproof){sout.range_proof = RangeProof.SignValue(amount,blind_factor, nonce)}
             else{sout.range_proof = emptyArray<Int>()}
-            var meta = new blind_output_meta()
+            var meta = blind_output_meta()
             meta.label = Recipient.label
             meta.auth = sout.owner
             meta.SetMemoData(amountasset, blind_factor, sout.commitment);

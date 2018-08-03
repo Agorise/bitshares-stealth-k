@@ -106,7 +106,7 @@ class StealthID(label_or_account: Any, pubkeyobj: Any?, privkeyobject: ECKey?)
                 {
                     var foundID = StealthID(
                         namelabel,
-                        ECKey.fromPublicOnly(Address(accounts[i].publickey).pubkey)
+                        ECKey.fromPublicOnly(Address(accounts[i].publickey).pubkey),
                         PrivateKey.fromWIF(accounts[i].privatekey))
                     var coins = DB.GetUnspentCoins(foundID.label)
                     foundID.setCoins(coins)

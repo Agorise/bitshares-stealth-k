@@ -1,6 +1,12 @@
 import jdk.nashorn.internal.objects.NativeUint8Array
 import cy.agorise.graphenej.Address
 import org.bitcoinj.core.ECKey
+import org.bitcoinj.core.Base58
+import cy.agorise.graphenej.Util
+import javax.crypto.Cipher
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
+
 /** confidential.kt
  *
  *  Classes and structs to represent components of confidential
@@ -42,12 +48,11 @@ class stealth_confirmation()
      */
     fun Base58(): String
     {
-
-        return base58.encode(Serializer.stealth_confirmation.toBuffer()) //TODO: Find appropriate b58 module. also java serializer.
+        return Base58.encode(Serializer.stealth_confirmation.toBuffer())
     }
-    fun ReadBase58(rcpt_txt)
+    fun ReadBase58(rcpt_txt: String)
     {
-        var tmp = Serializer.stealth_confirmation.fromBuffer(bs58.decode(rcpt_txt))//TODO: Again, appropriate b58 & serializer
+        var tmp = Serializer.stealth_confirmation.fromBuffer(Base58.decode(rcpt_txt))
         one_time_key = tmp.one_time_key
         to = tmp.to
         encrypted_memo = tmp.encrypted_memo
@@ -88,26 +93,34 @@ class stealth_cx_memo_data()
      *         think), used to initialize key and iv of the aes
      *         encoder.
      */
-    fun EncryptWithSecret(secret: Any?): ByteArray//Todo: Aescoder..
+    fun EncryptWithSecret(secret: ByteArray): ByteArray//Todo: Aescoder..
     {
-        var aescoder = AesCrypt()
-        var aescoder: Any? = Aes.fromSha512(secret.toString("hex"))
+        if(secret.size < 128) { throw error("Hash(Byte Array, not hex) smaller than 64 passed.") }
+        var aiv = secret.slice(IntRange(32,48)).toByteArray()
+        var akey = secret.slice(IntRange(0,32)).toByteArray()
+        var x = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        var y = SecretKeySpec(akey, "AES")
+        x.init(Cipher.ENCRYPT_MODE,y,IvParameterSpec(aiv))
         var memo_data_flat: ByteArray = Serializer.stealth_memo_data.toBuffer(this)
-        var retval: ByteArray = aescoder.encrypt(memo_data_flat)
-        aescoder.clear()
-        return retval
+        return x.doFinal(memo_data_flat)
+
     }
-    fun Decrypt(encrypted: Any?, secret: ByteArray ): Unit
+    fun Decrypt(encrypted: ByteArray?, secret: ByteArray ): Unit
     {
-        var aescoder: AesCoder = Aes.fromSha512(secret.toHex())
-        var memo_data_flat: ByteArray = aescoder.decrypt(encrypted) // :o
+
+        if(secret.size < 128) { throw error("Hash(Byte Array, not hex) smaller than 64 passed.") }
+        var aiv = secret.slice(IntRange(32,48)).toByteArray()
+        var akey = secret.slice(IntRange(0,32)).toByteArray()
+        var x = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        var y = SecretKeySpec(akey, "AES")
+        x.init(Cipher.DECRYPT_MODE,y,IvParameterSpec(aiv))
+        var memo_data_flat: ByteArray = x.doFinal(encrypted)
         var memo = Serializer.stealth_memo_data.fromBuffer(memo_data_flat)
-        this.from: String = memo.from
-        this.amount: Any? = memo.amount
+        this.from = memo.from
+        this.amount = memo.amount
         this.blinding_factor = memo.blinding_factor
         this.commitment = memo.commitment
         this.check = memo.check
-        aescoder.clear()
     }
 }
 /**
@@ -137,13 +150,19 @@ class blind_output_meta()
      */
     fun SetKeys(one_time: Any?, to_key: Any?) : Unit
     {
-        if(one_time is PrivateKey)
+        var x: Any? = null
+        if(one_time is PrivateKey.Companion)
         {
-            var x = one_time as PrivateKey
-            one_time = Address(x.key) //Drop Private info.
+            x = Address(ECKey.fromPublicOnly(one_time.key.pubKey))
+            this.pub_key = to_key as String
+            this.confirmation.SetPubKeys(x, to_key as Address)
+
         }
-        this.pub_key = to_key
-        this.confirmation.SetPubKeys(one_time, to_key)
+        else
+        {
+            this.pub_key = to_key as String
+            this.confirmation.SetPubKeys(Address(one_time as String), to_key as Address)
+        }
     }
     /**
      *  Sets the primary fields on the decrypted_memo member. This is
