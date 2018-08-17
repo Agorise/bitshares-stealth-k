@@ -2,7 +2,7 @@ import cy.agorise.graphenej.Address
 import cy.agorise.graphenej.PublicKey
 import org.bitcoinj.core.ECKey
 
-data class CAccount(val name: String, val id: String)
+data class CAccount(val name: String, val id: Int)
 /**
  *  This class is a wrapper class around account/contact classes of
  *  heterogeneous type. It provides uniform access no matter if we are
@@ -30,7 +30,7 @@ class StealthID(label_or_account: Any, pubkeyobj: Any?, privkeyobject: ECKey?)
     var PublicKey: PublicKey? = null
     var PrivateKey: ECKey? = null
     var isblind: Boolean = false
-    lateinit var id: Any;
+    var id: Int = 0;
     lateinit var coins: Array <BlindCoin>;
     init
     {
