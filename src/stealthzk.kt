@@ -1,10 +1,7 @@
-/*
-import org.bouncycastle.math.ec.ECFieldElement
+import org.bouncycastle.jce.ECNamedCurveTable
 import org.bouncycastle.math.ec.ECPoint
-import org.bouncycastle.math.ec.custom.sec.SecP256K1Curve
+import org.bouncycastle.util.encoders.Hex
 import java.math.BigInteger
-import java.security.spec.ECField
-*/
 
 /**@file
  *
@@ -27,23 +24,33 @@ import java.security.spec.ECField
  *  the state of this project, however.
  *
  */
-/*
-data class secp256k1altgenc(var G2x: String = "50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0",
-                            var G2y: String = "31d3c6863973926e049e637cb1b5f40a36dac28af1766968c30c2313f3a38904")
-var secp256k1altgen = secp256k1altgenc()
-var G2X = getfieldelement
-var G2 = ECPoint(SecP256K1Curve(), ECFieldElement().fr, ECFieldElement)
-fun zk_sha256(input): Unit
-{
-    return BA_Buffer.from(sha256.array(input))
-}
-*/
 object StealthZK{
 
-    val G  : Int = 7;     // TEMPORARY "Generators"
-    val G2 : Int = 13;
+    val ecSpec = ECNamedCurveTable.getParameterSpec("secp256k1")
+    // Curve Specs from table
 
-    fun BlindCommit(blindfactor: Int, value: Int) : Int {
-        return blindfactor * G + value * G2
+    val G : ECPoint = ecSpec.g
+    // secp256k1 Generator G
+
+    val G2 = ecSpec.curve.decodePoint(Hex.decode("0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"))
+    // This one is the "alternate" generator proposed by Maxwell, et al, for Confidential Transactions
+    // x: "50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"
+    // y: "31d3c6863973926e049e637cb1b5f40a36dac28af1766968c30c2313f3a38904"
+
+    /**
+     *  BlindCommit(blind, value) : ECPoint
+     *
+     *  Returns a Pedersen commitment for blind TX on secp256k1 curve.  This is curve point that
+     *  commits to a value.  It is blinded by a random blinding factor.  Blind and value are taken
+     *  as BigIntegers assumed less than curve order n.
+     *
+     *  Computed as: commit = blind * G + value * G2.
+     *
+     */
+    fun BlindCommit(blind: BigInteger, value: BigInteger) : ECPoint {
+
+        return G.multiply(blind).add(G2.multiply(value))
+
     }
+
 }

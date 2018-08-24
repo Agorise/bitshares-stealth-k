@@ -1,15 +1,20 @@
+import org.bouncycastle.util.encoders.Hex
+import java.math.BigInteger
+
 object TestSuite {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        println("Heeeelllllooooowwwwww")
 
-        var blindfact : Int = 55
-        var amount : Int = 4
+        println("Begin Testing Suite:")
 
-        var C : Int = StealthZK.BlindCommit(blindfact, amount)
+        println("Testing BlindCommit:")
 
-        println("Commitment is ${C}")
+        var blindfact = BigInteger("ffff", 16)
+        var amount = BigInteger("100")
+        var C = StealthZK.BlindCommit(blindfact, amount)
+
+        println("Commitment is (x,y): (${C.xCoord}, ${C.yCoord})")
 
     }
 
