@@ -1,7 +1,11 @@
 import org.bouncycastle.jce.ECNamedCurveTable
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.math.ec.ECPoint
 import org.bouncycastle.util.encoders.Hex
 import java.math.BigInteger
+import java.security.KeyPair
+import java.security.KeyPairGenerator
+import java.security.SecureRandom
 
 /**
  *  Class StealthConfig
@@ -35,5 +39,14 @@ class StealthConfig(curvename: String) {
     // has a MAX_SUPPLY which is a power of ten, rather than a power of two.)
 
     val curveOrder : BigInteger get() = ecSpec.n
+
+    /**
+     * Simple Key Pair Generator that returns a key pair on the correct curve config.
+     */
+    fun GenerateKeyPair() : KeyPair {
+        val g = KeyPairGenerator.getInstance("EC", BouncyCastleProvider())
+        g.initialize(this.ecSpec, SecureRandom())
+        return g.generateKeyPair()
+    }
 
 }

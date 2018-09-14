@@ -80,6 +80,16 @@ object TestSuite {
             println("   -i * G   ${Hex.toHexString(niG.getEncoded(true))}  mult: ${niBI}")
             println(" (N-i)* G   ${Hex.toHexString(NiG.getEncoded(true))}  mult: ${NiBI}")
         }
+
+        println("")
+        println("Testing Generation of EC Key Pairs:")
+
+        var kpair = zkconfig.GenerateKeyPair()
+
+        println("Generated Key A:")
+        println("Public: ${kpair.public.toString()}")
+        println("Private: ${kpair.private.toString()}")
+
     }
 
     @JvmStatic
