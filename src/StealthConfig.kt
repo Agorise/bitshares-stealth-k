@@ -1,11 +1,30 @@
+import org.bouncycastle.crypto.ec.CustomNamedCurves
+import org.bouncycastle.jcajce.provider.asymmetric.util.EC5Util
 import org.bouncycastle.jce.ECNamedCurveTable
+import org.bouncycastle.jce.ECPointUtil
+import org.bouncycastle.jce.interfaces.ECPrivateKey
+import org.bouncycastle.jce.interfaces.ECPublicKey
 import org.bouncycastle.jce.provider.BouncyCastleProvider
+import org.bouncycastle.jce.spec.ECNamedCurveSpec
 import org.bouncycastle.math.ec.ECPoint
 import org.bouncycastle.util.encoders.Hex
 import java.math.BigInteger
-import java.security.KeyPair
-import java.security.KeyPairGenerator
-import java.security.SecureRandom
+import java.security.*
+import java.security.PrivateKey
+import java.security.spec.ECParameterSpec
+import java.security.spec.ECPublicKeySpec
+
+/* Kind of a hack, but the following allows destructuring of the components of a KeyPair object, e.g. when
+ * returned from StealthConfig.GenerateKeyPair().  By "kind of a hack," I mean, this works, but is probably
+ * the WRONG place to make this extension to the KeyPair class. Goal is to get the Kotlin-like behavior
+ * (destructurability) from this Java class. But defining the extension here will likely at some point
+ * conflict with a similar extension placed elsewhere.
+ *
+ * Allows for:  val (pub, priv) = config.GenerateKeyPair();
+ * instead of:  val keypair = config.GenerateKeyPair(); val pub = keypair.public; //...
+ */
+operator fun KeyPair.component1() : PublicKey {return this.public}
+operator fun KeyPair.component2() : PrivateKey {return this.private}
 
 /**
  *  Class StealthConfig
@@ -19,16 +38,20 @@ import java.security.SecureRandom
  *
  *  Usage: instantiate one of these and set platform parameters; pass to construction of other objects.
  */
-
 class StealthConfig(curvename: String) {
 
-    val ecSpec = ECNamedCurveTable.getParameterSpec(curvename)
+    init {
+        Security.addProvider(BouncyCastleProvider())
+    }
+
+    val ecNamedSpec = ECNamedCurveTable.getParameterSpec(curvename)
+    val ecSpec : ECParameterSpec = ECNamedCurveSpec(curvename, ecNamedSpec.curve, ecNamedSpec.g, ecNamedSpec.n, ecNamedSpec.h, ecNamedSpec.seed);
     // Curve Specs from table
 
-    val G : ECPoint = ecSpec.g
+    val G : ECPoint = ecNamedSpec.g as ECPoint
     // secp256k1 Generator G
 
-    val G2 = ecSpec.curve.decodePoint(Hex.decode("0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"))
+    val G2 = ecNamedSpec.curve.decodePoint(Hex.decode("0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"))
     // This one is the "alternate" generator proposed by Maxwell, et al, for Confidential Transactions
     // x: "50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"
     // y: "31d3c6863973926e049e637cb1b5f40a36dac28af1766968c30c2313f3a38904"
@@ -38,15 +61,29 @@ class StealthConfig(curvename: String) {
     // platform.  Example: enough bits to represent max value of token.  Or an explicit ma value (e.g. BitShares
     // has a MAX_SUPPLY which is a power of ten, rather than a power of two.)
 
-    val curveOrder : BigInteger get() = ecSpec.n
+    val curveOrder : BigInteger get() = ecNamedSpec.n
 
     /**
      * Simple Key Pair Generator that returns a key pair on the correct curve config.
      */
-    fun GenerateKeyPair() : KeyPair {
+    fun generateKeyPair() : KeyPair {
         val g = KeyPairGenerator.getInstance("EC", BouncyCastleProvider())
         g.initialize(this.ecSpec, SecureRandom())
         return g.generateKeyPair()
+    }
+
+    /**
+     *  This will decode a PublicKey object from a hex string assumed to represent a key on the
+     *  current curve in compressed ("02xxxx") or uncompressed ("04xxxxyyyy") format.
+     */
+    fun decodePublicKey(encoded : String) : PublicKey {
+        val fact = KeyFactory.getInstance("ECDH", "BC")
+        val pubKeySpec = ECPublicKeySpec(
+                ECPointUtil.decodePoint(
+                        this.ecSpec.curve,
+                        Hex.decode(encoded)),
+                this.ecSpec)
+        return fact.generatePublic(pubKeySpec)
     }
 
 }

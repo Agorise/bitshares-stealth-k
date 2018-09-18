@@ -1,5 +1,15 @@
+import org.bouncycastle.crypto.generators.ECKeyPairGenerator
+import org.bouncycastle.jcajce.provider.asymmetric.ec.BCECPublicKey
+import org.bouncycastle.jce.ECPointUtil
 import org.bouncycastle.util.encoders.Hex
 import java.math.BigInteger
+import java.security.KeyFactory
+import java.security.KeyPair
+import java.security.PrivateKey
+import java.security.PublicKey
+import java.security.spec.ECPoint
+import java.security.spec.ECPrivateKeySpec
+import java.security.spec.ECPublicKeySpec
 
 object TestSuite {
 
@@ -84,13 +94,44 @@ object TestSuite {
         println("")
         println("Testing Generation of EC Key Pairs:")
 
-        var kpair = zkconfig.GenerateKeyPair()
+        var keyPairA = zkconfig.generateKeyPair()
+        var (pubKeyB) = zkconfig.generateKeyPair()
 
         println("Generated Key A:")
-        println("Public: ${kpair.public.toString()}")
-        println("Private: ${kpair.private.toString()}")
+        println("Public: ${keyPairA.public.toString()}")
+        println("Private: ${keyPairA.private.toString()}")
+        println("Generated Key B:")
+        println("Public: ${pubKeyB.toString()}")
+
+        var bo = BlindOutput(zkconfig, keyPairA, pubKeyB)
+        bo.ComputeSharedSecret()
+
+        //val lowPubKeySpec = ECPublicKeySpec(
+        //        ECPointUtil.decodePoint(
+        //                zkconfig.ecSpec.curve,
+        //                Hex.decode("02000000000000000000000000000000000000000000000000000000000000879e")),
+        //        zkconfig.ecSpec)
+        //val lowPubKey = fact.generatePublic(lowPubKeySpec)
+
+        val lowPubKey = zkconfig.decodePublicKey("02000000000000000000000000000000000000000000000000000000000000879e")
+
+        val fact = KeyFactory.getInstance("ECDH", "BC")
+        val lowPrivKeySpec = ECPrivateKeySpec(BigInteger("1"),zkconfig.ecSpec)
+        val lowPrivKey = fact.generatePrivate(lowPrivKeySpec)
+        //val lowPrivPubKey = fact.generatePublic(lowPrivKeySpec) // Doesn't work. Probably need to multiple the BigInt by the generator.
+        val lowKeyPair = KeyPair(lowPrivPubKey, lowPrivKey)
+
+        var bo2 = BlindOutput(zkconfig, lowKeyPair, lowPubKey)
+        bo2.ComputeSharedSecret()
+
+        println("Boo yeea!")
 
     }
+
+
+    /*  **************************************
+     *  HELPER FUNCTIONS FOLLOW:
+     */
 
     @JvmStatic
     fun TestBlindCommit(blind: BigInteger, values: Array<BigInteger>, label: String) {
