@@ -12,6 +12,7 @@ import java.math.BigInteger
 import java.security.*
 import java.security.PrivateKey
 import java.security.spec.ECParameterSpec
+import java.security.spec.ECPrivateKeySpec
 import java.security.spec.ECPublicKeySpec
 
 /* Kind of a hack, but the following allows destructuring of the components of a KeyPair object, e.g. when
@@ -70,6 +71,22 @@ class StealthConfig(curvename: String) {
         val g = KeyPairGenerator.getInstance("EC", BouncyCastleProvider())
         g.initialize(this.ecSpec, SecureRandom())
         return g.generateKeyPair()
+    }
+
+    /**
+     *   Generate a Key Pair from a known private key secret integer
+     */
+    fun generateKeyPair(d : BigInteger) : KeyPair {
+        val fact = KeyFactory.getInstance("ECDH", "BC")
+        val pubKeySpec = ECPublicKeySpec(
+                ECPointUtil.decodePoint(  // BC ECPoint and Java ECPoint are not same... encode/decode to "cast"
+                        this.ecSpec.curve,
+                        this.G.multiply(d).getEncoded(true)),
+                this.ecSpec)
+        val pubKey =  fact.generatePublic(pubKeySpec)
+        val privKeySpec = ECPrivateKeySpec(d,this.ecSpec)
+        val privKey = fact.generatePrivate(privKeySpec)
+        return KeyPair(pubKey, privKey)
     }
 
     /**

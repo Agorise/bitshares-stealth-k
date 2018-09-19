@@ -106,20 +106,8 @@ object TestSuite {
         var bo = BlindOutput(zkconfig, keyPairA, pubKeyB)
         bo.ComputeSharedSecret()
 
-        //val lowPubKeySpec = ECPublicKeySpec(
-        //        ECPointUtil.decodePoint(
-        //                zkconfig.ecSpec.curve,
-        //                Hex.decode("02000000000000000000000000000000000000000000000000000000000000879e")),
-        //        zkconfig.ecSpec)
-        //val lowPubKey = fact.generatePublic(lowPubKeySpec)
-
         val lowPubKey = zkconfig.decodePublicKey("02000000000000000000000000000000000000000000000000000000000000879e")
-
-        val fact = KeyFactory.getInstance("ECDH", "BC")
-        val lowPrivKeySpec = ECPrivateKeySpec(BigInteger("1"),zkconfig.ecSpec)
-        val lowPrivKey = fact.generatePrivate(lowPrivKeySpec)
-        //val lowPrivPubKey = fact.generatePublic(lowPrivKeySpec) // Doesn't work. Probably need to multiple the BigInt by the generator.
-        val lowKeyPair = KeyPair(lowPrivPubKey, lowPrivKey)
+        val lowKeyPair = zkconfig.generateKeyPair(BigInteger("1"))
 
         var bo2 = BlindOutput(zkconfig, lowKeyPair, lowPubKey)
         bo2.ComputeSharedSecret()
