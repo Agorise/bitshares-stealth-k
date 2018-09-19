@@ -11,6 +11,7 @@ import java.security.KeyFactory
 import java.security.KeyPair
 import java.security.MessageDigest
 import java.security.PublicKey
+import java.security.PrivateKey
 import java.security.interfaces.ECKey
 import java.security.interfaces.ECPrivateKey
 import java.security.interfaces.ECPublicKey
@@ -48,8 +49,19 @@ import javax.crypto.KeyAgreement
  *
  */
 class BlindOutput(val config: StealthConfig,
-                      val LocalKeyPair: KeyPair,
-                      val RemotePubKey: PublicKey) {
+                  val onetimePub: PublicKey,
+                  val addressPub: PublicKey,
+                  val privateKey: PrivateKey,
+                  val isReceiver: Boolean      // True implies private corresponds to addressPub, else onetimePub
+                 )
+{
+
+    val localPubKey : PublicKey    // return the PubKey for which we know the private key
+        get() = if(isReceiver) addressPub else onetimePub
+
+    val remotePubKey : PublicKey   // return PubKey for which we DON'T know the private key
+        get() = if(isReceiver) onetimePub else addressPub
+
 
     /**
      *  Compute Shared Secret Data between local and remote keys.
@@ -76,8 +88,8 @@ class BlindOutput(val config: StealthConfig,
     fun ComputeSharedSecret() : ByteArray {
 
         val ka = KeyAgreement.getInstance("ECDH", "BC")
-        ka.init(this.LocalKeyPair.private)
-        ka.doPhase(this.RemotePubKey, true)
+        ka.init(this.privateKey)
+        ka.doPhase(this.remotePubKey, true)
         val sharedXbuf = ka.generateSecret()   // Byte[n] array; n matches size of key filed (32 for secp256k1)
 
         val digest512 = MessageDigest.getInstance("SHA-512")

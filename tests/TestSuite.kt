@@ -94,22 +94,22 @@ object TestSuite {
         println("")
         println("Testing Generation of EC Key Pairs:")
 
-        var keyPairA = zkconfig.generateKeyPair()
-        var (pubKeyB) = zkconfig.generateKeyPair()
+        var keyPairOTK = zkconfig.generateKeyPair()
+        var (pubKeyAddr) = zkconfig.generateKeyPair()
 
         println("Generated Key A:")
-        println("Public: ${keyPairA.public.toString()}")
-        println("Private: ${keyPairA.private.toString()}")
+        println("Public: ${keyPairOTK.public.toString()}")
+        println("Private: ${keyPairOTK.private.toString()}")
         println("Generated Key B:")
-        println("Public: ${pubKeyB.toString()}")
+        println("Public: ${pubKeyAddr.toString()}")
 
-        var bo = BlindOutput(zkconfig, keyPairA, pubKeyB)
+        var bo = BlindOutput(zkconfig, keyPairOTK.public, pubKeyAddr, keyPairOTK.private, false)
         bo.ComputeSharedSecret()
 
-        val lowPubKey = zkconfig.decodePublicKey("02000000000000000000000000000000000000000000000000000000000000879e")
-        val lowKeyPair = zkconfig.generateKeyPair(BigInteger("1"))
+        val lowPubKeyAddr = zkconfig.decodePublicKey("02000000000000000000000000000000000000000000000000000000000000879e")
+        val lowKeyPairOTK = zkconfig.generateKeyPair(BigInteger("1"))
 
-        var bo2 = BlindOutput(zkconfig, lowKeyPair, lowPubKey)
+        var bo2 = BlindOutput(zkconfig, lowKeyPairOTK.public, lowPubKeyAddr, lowKeyPairOTK.private, false)
         bo2.ComputeSharedSecret()
 
         println("Boo yeea!")
