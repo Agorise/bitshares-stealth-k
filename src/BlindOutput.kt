@@ -2,10 +2,12 @@ import org.bouncycastle.crypto.CipherParameters
 import org.bouncycastle.crypto.agreement.ECDHBasicAgreement
 import org.bouncycastle.crypto.generators.ECKeyPairGenerator
 import org.bouncycastle.crypto.params.ECPrivateKeyParameters
+import org.bouncycastle.jcajce.provider.asymmetric.ec.BCECPublicKey
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.math.ec.ECPoint
 import org.bouncycastle.pqc.jcajce.provider.BouncyCastlePQCProvider
 import org.bouncycastle.util.encoders.Hex
+import sun.jvm.hotspot.runtime.Bytes
 import java.math.BigInteger
 import java.security.KeyFactory
 import java.security.KeyPair
@@ -17,6 +19,7 @@ import java.security.interfaces.ECPrivateKey
 import java.security.interfaces.ECPublicKey
 import java.security.spec.ECParameterSpec
 import java.security.spec.ECPrivateKeySpec
+import java.security.spec.ECPublicKeySpec
 import javax.crypto.KeyAgreement
 
 
@@ -48,6 +51,7 @@ import javax.crypto.KeyAgreement
  *  (OR the sig could be senderPubKey, receiverPubKey, privateKey, privKeyIsRcvr : bool)
  *
  */
+const val SHARED_SECRET__HASH_LENGTH = 64
 class BlindOutput(val config: StealthConfig,
                   val onetimePub: PublicKey,
                   val addressPub: PublicKey,
@@ -56,15 +60,40 @@ class BlindOutput(val config: StealthConfig,
                  )
 {
 
+    /*** STATE PROPERTIES ***/
+
+    val sharedsecret : ByteArray               /** 512-bit secret shared between sender and receiver */
+        get() {
+            if (_sharedsecret.size != SHARED_SECRET__HASH_LENGTH) {
+                _sharedsecret = ComputeSharedSecretHashed() }
+            return _sharedsecret }
+    private var _sharedsecret = ByteArray(0)   //  valid when .size == SHARED_SECRET_HASH_LENGTH
+
+    val outputPublicKey : PublicKey
+        get() {
+            if (_outputPublicKey == this.addressPub) {
+                _outputPublicKey = ComputeTxOutputPublicKey()
+            }
+            return _outputPublicKey
+        }
+    private var _outputPublicKey : PublicKey = addressPub  // valid when != addressPub
+
+
+    /*** CONVENIENCE ACCESSORS ***/
+
     val localPubKey : PublicKey    // return the PubKey for which we know the private key
         get() = if(isReceiver) addressPub else onetimePub
 
     val remotePubKey : PublicKey   // return PubKey for which we DON'T know the private key
         get() = if(isReceiver) onetimePub else addressPub
 
+    private val addressECPoint = (addressPub as BCECPublicKey).q
+
+
+    /*** PRIVATE HELPER/WORK FUNCTIONS: ***/
 
     /**
-     *  Compute Shared Secret Data between local and remote keys.
+     *  Compute Shared Secret Data between local and remote keys. (Private)
      *
      *  We follow the protocol of the reference wallet (cli_wallet) and take a sha512 hash of the compressed
      *  pubkey representation, with sign byte removed, of the shared EC point.  Removing the sign byte gives
@@ -85,7 +114,7 @@ class BlindOutput(val config: StealthConfig,
      *       (We use sha512)
      *
      */
-    fun ComputeSharedSecret() : ByteArray {
+    private fun ComputeSharedSecretHashed() : ByteArray {
 
         val ka = KeyAgreement.getInstance("ECDH", "BC")
         ka.init(this.privateKey)
@@ -96,8 +125,7 @@ class BlindOutput(val config: StealthConfig,
         digest512.reset()
         val shareddata = digest512.digest(sharedXbuf)  // Byte[64] array
 
-        println("SharedXBuf: ${Hex.toHexString(sharedXbuf)}")
-        println("SharedData: ${Hex.toHexString(shareddata)}")
+        println("  Shared X point was: ${Hex.toHexString(sharedXbuf)}")
 
         return shareddata
 
@@ -108,43 +136,52 @@ class BlindOutput(val config: StealthConfig,
      *  This key is derived in a deterministic way from the ECDH shared secret between sender-generated Random Key
      *  and receiver's Address Key(s).  Specifically, a child-key offset from the receiver's public key is computed.
      */
-    fun ComputeSpendPubkey() : PublicKey {
+    private fun ComputeTxOutputPublicKey() : PublicKey {
+        val cG = this.config.G.multiply(ComputeTxOutputPrivKeyDelta())
+        val TxOutputQ = this.addressECPoint.add(cG)
+        return config.PublicKeyFromECPoint(TxOutputQ)
+    }
 
-        val shareddata = this.ComputeSharedSecret()
-        val digest256 = MessageDigest.getInstance("SHA-256")
-        val offset = digest256.digest(shareddata)
+    /** Compute the scalar offset between Address base-point and the curve point that can SPEND the output
+     *
+     *  Note: Both sender and receiver can compute this vale.  (But only receiver can compute the actual
+     *  key.)  We use the shared-secret data and destination stealth address key to compute scalar offset,
+     *  as follows:
+     *
+     *  offset 'c' = BigInteger(SHA256( [compressed address pubkey] || SHA256([shared secret data]) ))
+     *
+     *  This agrees with the procedure in cli_wallet, and in bitsharesjs/lib/ecc/src/PublicKey.js
+     *
+     *  The standardization of this derivation process is necessary to the recipients ability to detect
+     *  inbound output due to the relationship between OTK, AddressKey and TxOutputKey.
+     */
+    private fun ComputeTxOutputPrivKeyDelta() : BigInteger {
 
-        /** Note: The offsetting process in the cli_wallet is bizarrely complex, and doesn't seem (at first glance)
-         *  to be a simple additive offset process.  Perhaps it's attempting to mimic XPRIV/XPUB child key process,
-         *  but using something on-the-fly as the chain code???  Not sure.  Anyway, references:
-         *
-         *  public_key::child(offset) is called from wallet.cpp in:
-         *  https://github.com/bitshares/bitshares-core/blob/58969c2a0307e32bbdee731d1f3f9a193b0d1b3f/libraries/wallet/wallet.cpp#L4264
-         *
-         *  fc::ecc::public_key::child()
-         *  fc::ecc::private_key::child()  are defined in:
-         *  https://github.com/bitshares/bitshares-fc/blob/master/src/crypto/elliptic_common.cpp
-         *  https://github.com/bitshares/bitshares-fc/blob/master/include/fc/crypto/elliptic.hpp
-         *
-         *  fc::ecc::public_key::add()  is defined in:
-         *  https://github.com/bitshares/bitshares-fc/blob/master/src/crypto/elliptic_secp256k1.cpp
-         *  Ack!  It's also defined in at least one other file in that directory.
-         *  Choice of implementation perhaps? (ssl vs secp256k1-zkp?)
-         *
-         *  UPDATE: It LOOKS like public_key::add() for a pubkey A = aG and offsetprime c results in
-         *  a key P = aG + cG.  My eyes were bleeding traversing the source tree (also ended up in secp256k1-zkp
-         *  repo).  But it DOES look like a linear add to receiver's Address key.  Surprising thing is (it looks
-         *  so far, anyway) that the "offset" arg to the child() function does NOT become the value c that
-         *  multiplies G, but rather c = sha256(A|offset).  ...So there's another hash round. (Perhaps in parallel
-         *  to XPUB protocol)
-         *
-         *  AND:  Looking at PublicKey in JavaScript bitsharesjs pretty much confirms this is the derivation
-         *  procedure.  (God, that code is much easier to follow...)
-         *  https://github.com/bitshares/bitsharesjs/blob/master/lib/ecc/src/PublicKey.js
-         *
-         */
+        fun _ChildSeedFromSecret(secretdata: ByteArray): ByteArray {
+            val digest256 = MessageDigest.getInstance("SHA-256")
+            return digest256.digest(secretdata)
+        }
 
-        return this.config.generateKeyPair().public  // TEMP: (Obviously)
+        fun _GetPseudoChainCodeFromPublicKeyQ(Q: ECPoint): ByteArray {
+            val QEnc = Q.getEncoded(true)
+            check(QEnc.size == 33) { "Problem encoding pseudo chain code for child key derivation" }
+            return QEnc
+        }
+
+        fun _ChildOffsetFromSeed(chain: ByteArray, seed: ByteArray): BigInteger {
+            val digest256 = MessageDigest.getInstance("SHA-256")
+            digest256.update(chain)
+            digest256.update(seed)
+            return BigInteger(digest256.digest()) //TODO: bounds check on BigInt
+        }
+
+        val childseed = _ChildSeedFromSecret(this.sharedsecret)
+        val childchain = _GetPseudoChainCodeFromPublicKeyQ(this.addressECPoint)
+        val childoffset = _ChildOffsetFromSeed(childchain, childseed)
+        // TODO: Bounds checks on childoffset BigInt
+
+        return childoffset
 
     }
+
 }

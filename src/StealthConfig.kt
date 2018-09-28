@@ -27,6 +27,10 @@ import java.security.spec.ECPublicKeySpec
 operator fun KeyPair.component1() : PublicKey {return this.public}
 operator fun KeyPair.component2() : PrivateKey {return this.private}
 
+/* Some extension functions for convenience.  Probably there is a more appropriate place to put these than here.
+ */
+fun ByteArray.toHexString() : String {return Hex.toHexString(this)}  // Make the BC Hex.toHexString() available
+
 /**
  *  Class StealthConfig
  *
@@ -99,6 +103,16 @@ class StealthConfig(curvename: String) {
                 ECPointUtil.decodePoint(
                         this.ecSpec.curve,
                         Hex.decode(encoded)),
+                this.ecSpec)
+        return fact.generatePublic(pubKeySpec)
+    }
+
+    fun PublicKeyFromECPoint(Q: ECPoint) : PublicKey {     // Get a Java ECPublicKey from a BC ECPoint
+        val fact = KeyFactory.getInstance("ECDH", "BC")
+        val pubKeySpec = ECPublicKeySpec(
+                ECPointUtil.decodePoint(  // BC ECPoint and Java ECPoint are not same... encode/decode to "cast"
+                        this.ecSpec.curve,
+                        Q.getEncoded(true)),
                 this.ecSpec)
         return fact.generatePublic(pubKeySpec)
     }

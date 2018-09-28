@@ -93,24 +93,34 @@ object TestSuite {
 
         println("")
         println("Testing Generation of EC Key Pairs:")
+        println("***********************************")
+        println("")
+
+        println("Test 1: Randomly generated keys:")
 
         var keyPairOTK = zkconfig.generateKeyPair()
         var (pubKeyAddr) = zkconfig.generateKeyPair()
 
-        println("Generated Key A:")
-        println("Public: ${keyPairOTK.public.toString()}")
-        println("Private: ${keyPairOTK.private.toString()}")
-        println("Generated Key B:")
-        println("Public: ${pubKeyAddr.toString()}")
+        println("  Generated Key A:")
+        println("  Public: ${keyPairOTK.public.toString()}")
+        println("  Private: ${keyPairOTK.private.toString()}")
+        println("  Generated Key B:")
+        println("  Public: ${pubKeyAddr.toString()}")
 
         var bo = BlindOutput(zkconfig, keyPairOTK.public, pubKeyAddr, keyPairOTK.private, false)
-        bo.ComputeSharedSecret()
+        println ("  Shared-secret buffer is: ${bo.sharedsecret.toHexString()}")
+        println ("  Shared-secret buffer is: ${bo.sharedsecret.toHexString()}")
+
+        println("")
+        println("Test 2: Low-numbered keys:")
 
         val lowPubKeyAddr = zkconfig.decodePublicKey("02000000000000000000000000000000000000000000000000000000000000879e")
         val lowKeyPairOTK = zkconfig.generateKeyPair(BigInteger("1"))
+        val TEST = (lowPubKeyAddr as BCECPublicKey).q as org.bouncycastle.math.ec.ECPoint
 
         var bo2 = BlindOutput(zkconfig, lowKeyPairOTK.public, lowPubKeyAddr, lowKeyPairOTK.private, false)
-        bo2.ComputeSharedSecret()
+        println ("  Shared-secret buffer is: ${bo2.sharedsecret.toHexString()}")
+        println ("  Tx Address is: ${bo2.outputPublicKey.toString()}")
 
         println("Boo yeea!")
 
