@@ -1,3 +1,7 @@
+import org.bitcoinj.core.Base58;
+import org.bitcoinj.core.ECKey;
+import org.spongycastle.crypto.digests.RIPEMD160Digest;
+
 /** class StealthAddress
  *
  *  BitShares Stealth Addresses and Tools
@@ -115,8 +119,60 @@
  *      this method checks the entire family.
  */
 
-class StealthAddress() {
+class StealthAddress(
+        val _ViewKey : ECKey,
+        val _SpendKey : ECKey,
+        val separateSpendKey : Boolean,
+        val prefix : String = "BTS")
+{
+
+    var _addressString : String = ""
+    override fun toString(): String {
+        if (_addressString.isEmpty()) {
+            _addressString = this.getAsPrefixedBase58CheckString()
+        }
+        return _addressString
+    }
+
+
+    constructor() : this(ECKey(), ECKey(), true) {
+        println("SA empty constructor")
+    }
+
+    val viewKey : ECKey
+        get() {return _ViewKey}
+    val spendKey : ECKey
+        get() {return if (separateSpendKey) _SpendKey else _ViewKey}
 
 
 
+    fun getAsPrefixedBase58CheckString() : String {
+        var keycat : ByteArray = this.viewKey.pubKey
+        if (separateSpendKey) {
+            keycat += this.spendKey.pubKey
+        }
+        val check : ByteArray = calculateChecksum(keycat)
+        keycat += check
+
+        println("Keybytes:   ${keycat.toHexString()}")
+
+        return this.prefix + Base58.encode(keycat)
+
+    }
+
+    fun verboseDescription() : String {
+        val builder = StringBuilder()
+        builder.append("Stealth Address: ${this}\n\n")
+        builder.append("  ViewKey:  ${this.viewKey.publicKeyAsHex}\n")
+        builder.append("  SpendKey: ${this.spendKey.publicKeyAsHex}\n")
+        return builder.toString()
+    }
+
+    private fun calculateChecksum(data: ByteArray): ByteArray {
+        val checksum = ByteArray(160 / 8)
+        val ripemd160Digest = RIPEMD160Digest()
+        ripemd160Digest.update(data, 0, data.size)
+        ripemd160Digest.doFinal(checksum, 0)
+        return checksum.sliceArray(0..3)
+    }
 }

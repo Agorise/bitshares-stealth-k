@@ -123,6 +123,14 @@ object TestSuite {
         println ("  Tx Address is: ${bo2.outputPublicKey.toString()}")
 
         println("Boo yeea!")
+        println("")
+        println("OK, New Stuff!")
+        println("")
+
+        var SA = StealthAddress()
+
+        println("${SA.verboseDescription()}")
+        println("${SA}")
 
     }
 
