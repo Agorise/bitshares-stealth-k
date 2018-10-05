@@ -1,6 +1,7 @@
 import org.bitcoinj.core.Base58;
 import org.bitcoinj.core.ECKey;
 import org.spongycastle.crypto.digests.RIPEMD160Digest;
+import java.security.MessageDigest
 
 /** class StealthAddress
  *
@@ -126,6 +127,10 @@ class StealthAddress(
         val prefix : String = "BTS")
 {
 
+    constructor() : this(ECKey(), ECKey(), true) {
+        println("SA empty constructor")
+    }
+
     var _addressString : String = ""
     override fun toString(): String {
         if (_addressString.isEmpty()) {
@@ -134,16 +139,10 @@ class StealthAddress(
         return _addressString
     }
 
-
-    constructor() : this(ECKey(), ECKey(), true) {
-        println("SA empty constructor")
-    }
-
     val viewKey : ECKey
         get() {return _ViewKey}
     val spendKey : ECKey
         get() {return if (separateSpendKey) _SpendKey else _ViewKey}
-
 
 
     fun getAsPrefixedBase58CheckString() : String {
@@ -175,4 +174,34 @@ class StealthAddress(
         ripemd160Digest.doFinal(checksum, 0)
         return checksum.sliceArray(0..3)
     }
+
+
+    /**
+     *  Returns shared secret between OTK and this.viewKey
+     *  BitShares Stealth defines the shared secret as the SHA512 hash of the ECDH shared X coordinate.
+     *  Throws if can't computes secret (e.g. if neither key has a private component).
+     */
+    fun getSharedSecret(OTK : ECKey) : ByteArray {
+        val digest512 = MessageDigest.getInstance("SHA-512")
+        digest512.reset()
+        val shareddata = digest512.digest(this.getSharedXCoord(OTK))
+        check(shareddata.size == 64)
+        return shareddata
+    }
+
+    /** Returns shared X coordinate between OTK and ViewKey
+     *  or else throws an assert exception if not enough private keys */
+    fun getSharedXCoord(OTK : ECKey) : ByteArray {
+        val assertmsg = "Could not get shared X coordinate."
+        check(this.viewKey.hasPrivKey() or OTK.hasPrivKey()) {assertmsg}
+        val localprivkey = if (this.viewKey.hasPrivKey()) this.viewKey.privKey else OTK.privKey
+        val remotepubkey = if (this.viewKey.hasPrivKey()) OTK.pubKeyPoint else this.viewKey.pubKeyPoint
+        val sharedPoint = remotepubkey.multiply(localprivkey)
+        check(!sharedPoint.isInfinity) {assertmsg}
+        check(sharedPoint.isValid) {assertmsg}
+        val sharedEncoded = sharedPoint.encoded
+        check(sharedEncoded.size == 33) {assertmsg} // 32-bytes plus sign byte
+        return sharedEncoded.sliceArray(1..32)
+    }
+
 }

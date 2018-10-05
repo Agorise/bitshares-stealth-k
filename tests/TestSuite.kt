@@ -1,3 +1,4 @@
+import org.bitcoinj.core.ECKey
 import org.bouncycastle.crypto.generators.ECKeyPairGenerator
 import org.bouncycastle.jcajce.provider.asymmetric.ec.BCECPublicKey
 import org.bouncycastle.jce.ECPointUtil
@@ -131,6 +132,11 @@ object TestSuite {
 
         println("${SA.verboseDescription()}")
         println("${SA}")
+
+        val OTK = ECKey()
+        println("\nOTK: ${OTK}")
+        println("Shared X:      ${SA.getSharedXCoord(OTK).toHexString()}")
+        println("Shared Secret: ${SA.getSharedSecret(OTK).toHexString()}")
 
     }
 
