@@ -185,7 +185,7 @@ class StealthAddress(
         val digest512 = MessageDigest.getInstance("SHA-512")
         digest512.reset()
         val shareddata = digest512.digest(this.getSharedXCoord(OTK))
-        check(shareddata.size == 64)
+        check(shareddata.size == digest512.digestLength) {"Problem with shared-secret hash"}
         return shareddata
     }
 
