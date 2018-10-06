@@ -93,10 +93,10 @@ import java.security.MessageDigest
  *
  *      Produce prefixed and Base58 encoded address string.
  *
- *  ->  .SharedSecret(OTK : ECKey) : Bytes[64]
+ *  ->  .getSharedSecret(OTK : ECKey) : Bytes[64]
  *
  *      Gives the 512-bit "shared secret" between the address's ViewKey and the OTK.  Either the ViewKey
- *      or the OTK must have a private key or else this will (TODO: should it trigger exception or return Bytes[0]?)
+ *      or the OTK must have a private key or else this will fail with assert exception.
  *
  *  ->  .DeriveChild(index) : StealthAddress
  *
@@ -131,33 +131,21 @@ class StealthAddress(
         println("SA empty constructor")
     }
 
-    var _addressString : String = ""
-    override fun toString(): String {
-        if (_addressString.isEmpty()) {
-            _addressString = this.getAsPrefixedBase58CheckString()
-        }
-        return _addressString
-    }
-
     val viewKey : ECKey
         get() {return _ViewKey}
     val spendKey : ECKey
         get() {return if (separateSpendKey) _SpendKey else _ViewKey}
 
 
-    fun getAsPrefixedBase58CheckString() : String {
-        var keycat : ByteArray = this.viewKey.pubKey
-        if (separateSpendKey) {
-            keycat += this.spendKey.pubKey
+    /** Get String representation of the Address.
+     */
+    override fun toString(): String {
+        if (_addressString.isEmpty()) {
+            _addressString = this.getAsPrefixedBase58CheckString()
         }
-        val check : ByteArray = calculateChecksum(keycat)
-        keycat += check
-
-        println("Keybytes:   ${keycat.toHexString()}")
-
-        return this.prefix + Base58.encode(keycat)
-
+        return _addressString
     }
+    var _addressString : String = ""
 
     fun verboseDescription() : String {
         val builder = StringBuilder()
@@ -167,6 +155,20 @@ class StealthAddress(
         return builder.toString()
     }
 
+    /* This is a back-end to the toString() method. */
+    fun getAsPrefixedBase58CheckString() : String {
+        var keycat : ByteArray = this.viewKey.pubKey
+        if (separateSpendKey) {
+            keycat += this.spendKey.pubKey
+        }
+        val check : ByteArray = calculateChecksum(keycat)
+        keycat += check
+        /***/println("Keybytes:   ${keycat.toHexString()}")
+        return this.prefix + Base58.encode(keycat)
+    }
+
+    /* Checksum used to MAC the address data before Base58'ing it.
+     * Returns first four bytes of RIPEMD160(data) */
     private fun calculateChecksum(data: ByteArray): ByteArray {
         val checksum = ByteArray(160 / 8)
         val ripemd160Digest = RIPEMD160Digest()
@@ -174,7 +176,6 @@ class StealthAddress(
         ripemd160Digest.doFinal(checksum, 0)
         return checksum.sliceArray(0..3)
     }
-
 
     /**
      *  Returns shared secret between OTK and this.viewKey
@@ -189,8 +190,11 @@ class StealthAddress(
         return shareddata
     }
 
-    /** Returns shared X coordinate between OTK and ViewKey
-     *  or else throws an assert exception if not enough private keys */
+    /**
+     *  Returns shared X coordinate between OTK and ViewKey
+     *  or else throws an assert exception if not enough private keys, etc.
+     *  (Generally not used directly; user should call getSharedSecret(...) instead.)
+     */
     fun getSharedXCoord(OTK : ECKey) : ByteArray {
         val assertmsg = "Could not get shared X coordinate."
         check(this.viewKey.hasPrivKey() or OTK.hasPrivKey()) {assertmsg}
