@@ -138,6 +138,10 @@ object TestSuite {
         println("Shared X:      ${SA.getSharedXCoord(OTK).toHexString()}")
         println("Shared Secret: ${SA.getSharedSecret(OTK).toHexString()}")
 
+        println("\nPrefixBase58Check test:\n")
+        println("D = \"\":         ${PrefixBase58Check("BTS")}")
+        println("D = \"\":         ${PrefixBase58Check("BTS", SA.viewKey.pubKey + SA.spendKey.pubKey)}")
+
     }
 
 
