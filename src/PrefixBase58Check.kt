@@ -22,7 +22,6 @@ class PrefixBase58Check(var prefix : String, var data : ByteArray = ByteArray(0)
         var raw = this.data
         val check : ByteArray = calculateChecksum(raw)
         raw += check
-        /***/println("Base58 preHex:  ${raw.toHexString()}")
         return this.prefix + Base58.encode(raw)
     }
 
