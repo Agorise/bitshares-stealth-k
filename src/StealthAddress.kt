@@ -1,6 +1,5 @@
-import org.bitcoinj.core.Base58;
 import org.bitcoinj.core.ECKey;
-import org.spongycastle.crypto.digests.RIPEMD160Digest;
+import java.math.BigInteger
 import java.security.MessageDigest
 
 /** class StealthAddress
@@ -147,34 +146,21 @@ class StealthAddress(
     }
     var _addressString : String = ""
 
-    fun verboseDescription() : String {
-        val builder = StringBuilder()
-        builder.append("Stealth Address: ${this}\n\n")
-        builder.append("  ViewKey:  ${this.viewKey.publicKeyAsHex}\n")
-        builder.append("  SpendKey: ${this.spendKey.publicKeyAsHex}\n")
-        return builder.toString()
-    }
-
     /* This is a back-end to the toString() method. */
     fun getAsPrefixedBase58CheckString() : String {
         var keycat : ByteArray = this.viewKey.pubKey
         if (separateSpendKey) {
             keycat += this.spendKey.pubKey
         }
-        val check : ByteArray = calculateChecksum(keycat)
-        keycat += check
-        /***/println("Keybytes:   ${keycat.toHexString()}")
-        return this.prefix + Base58.encode(keycat)
+        return PrefixBase58Check(this.prefix, keycat).toString()
     }
 
-    /* Checksum used to MAC the address data before Base58'ing it.
-     * Returns first four bytes of RIPEMD160(data) */
-    private fun calculateChecksum(data: ByteArray): ByteArray {
-        val checksum = ByteArray(160 / 8)
-        val ripemd160Digest = RIPEMD160Digest()
-        ripemd160Digest.update(data, 0, data.size)
-        ripemd160Digest.doFinal(checksum, 0)
-        return checksum.sliceArray(0..3)
+    fun verboseDescription() : String {
+        val builder = StringBuilder()
+        builder.append("Stealth Address: ${this}\n\n")
+        builder.append("  ViewKey:  ${this.viewKey.publicKeyAsHex}\n")
+        builder.append("  SpendKey: ${this.spendKey.publicKeyAsHex}\n")
+        return builder.toString()
     }
 
     /**
@@ -197,7 +183,7 @@ class StealthAddress(
      */
     fun getSharedXCoord(OTK : ECKey) : ByteArray {
         val assertmsg = "Could not get shared X coordinate."
-        check(this.viewKey.hasPrivKey() or OTK.hasPrivKey()) {assertmsg}
+        require(this.viewKey.hasPrivKey() or OTK.hasPrivKey()) {assertmsg}
         val localprivkey = if (this.viewKey.hasPrivKey()) this.viewKey.privKey else OTK.privKey
         val remotepubkey = if (this.viewKey.hasPrivKey()) OTK.pubKeyPoint else this.viewKey.pubKeyPoint
         val sharedPoint = remotepubkey.multiply(localprivkey)
@@ -206,6 +192,33 @@ class StealthAddress(
         val sharedEncoded = sharedPoint.encoded
         check(sharedEncoded.size == 33) {assertmsg} // 32-bytes plus sign byte
         return sharedEncoded.sliceArray(1..32)
+    }
+
+    /**
+     *  Returns an ECKey (public only) for authorization of a transaction output.  The key will be a child of
+     *  the stealth address keys and OTK, the one-time randomness key.  Either OTK or this.viewKey must contain
+     *  a private component, or an exception will be thrown.
+     */
+    fun getTxAuthKey(OTK : ECKey) : ECKey {
+        val secret = this.getSharedSecret(OTK)
+        val md = MessageDigest.getInstance("SHA-256"); md.reset()
+        val childIndex = md.digest(secret)
+        val offset = getChildOffset(this.viewKey, childIndex)
+        val offsetPoint = ECKey.fromPrivate(offset).pubKeyPoint
+        return ECKey.fromPublicOnly(this.spendKey.pubKeyPoint.add(offsetPoint))
+    }
+
+    private fun getChildOffset(ParentKey : ECKey, indexdata : ByteArray) : BigInteger {
+        require(indexdata.isNotEmpty()) {"Child Offset Index Data Cannot Be Empty"}
+        var parent = ParentKey
+        if (!parent.isCompressed) {
+            parent = ECKey.fromPublicOnly(ECKey.compressPoint(ParentKey.pubKeyPoint)) }
+        check(parent.isCompressed)
+        val message = parent.pubKey + indexdata
+        val md = MessageDigest.getInstance("SHA-256"); md.reset()
+        val digest = md.digest(message)
+        check(digest.size == md.digestLength)
+        return BigInteger(digest)
     }
 
 }

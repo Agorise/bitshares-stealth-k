@@ -1,16 +1,6 @@
 import org.bitcoinj.core.ECKey
-import org.bouncycastle.crypto.generators.ECKeyPairGenerator
-import org.bouncycastle.jcajce.provider.asymmetric.ec.BCECPublicKey
-import org.bouncycastle.jce.ECPointUtil
 import org.bouncycastle.util.encoders.Hex
 import java.math.BigInteger
-import java.security.KeyFactory
-import java.security.KeyPair
-import java.security.PrivateKey
-import java.security.PublicKey
-import java.security.spec.ECPoint
-import java.security.spec.ECPrivateKeySpec
-import java.security.spec.ECPublicKeySpec
 
 object TestSuite {
 
@@ -21,6 +11,31 @@ object TestSuite {
 
         println("Begin Testing Suite:")
         println("")
+
+        //TestBlindCommitment()
+        //TestPointNegation()
+        //TestECKeyPairGeneration()
+        //TestPrefixBase58Check()
+
+        var SA = StealthAddress()
+
+        println("${SA.verboseDescription()}")
+        println("${SA}")
+
+        val OTK = ECKey()
+        println("\nOTK: ${OTK}")
+        println("Shared X:      ${SA.getSharedXCoord(OTK).toHexString()}")
+        println("Shared Secret: ${SA.getSharedSecret(OTK).toHexString()}")
+        println("Child PubKey:  ${SA.getTxAuthKey(OTK).pubKey.toHexString()}")
+
+    }
+
+    /*  **************************************
+     *  TESTS:
+     */
+
+    @JvmStatic
+    fun TestBlindCommitment() {
         println("Testing BlindCommitment:")
 
         TestBlindCommit(BigInteger("FFFF", 16),
@@ -56,6 +71,10 @@ object TestSuite {
         TestBlindCommitException(BigInteger("FFFF", 16),
                 arrayOf(BigInteger("100"), BigInteger("200")),
                 "Too many values for generators")
+    }
+
+    @JvmStatic
+    fun TestPointNegation() {
 
         /* Next test if the various ways to "negate" a point are indeed equivalent.
            I.e., does -2*G == -(2*G) == (N-2)*G ?
@@ -92,6 +111,10 @@ object TestSuite {
             println(" (N-i)* G   ${Hex.toHexString(NiG.getEncoded(true))}  mult: ${NiBI}")
         }
 
+    }
+
+    @JvmStatic
+    fun TestECKeyPairGeneration() {
         println("")
         println("Testing Generation of EC Key Pairs:")
         println("***********************************")
@@ -108,37 +131,14 @@ object TestSuite {
         println("  Generated Key B:")
         println("  Public: ${pubKeyAddr.toString()}")
 
-        var bo = BlindOutput(zkconfig, keyPairOTK.public, pubKeyAddr, keyPairOTK.private, false)
-        println ("  Shared-secret buffer is: ${bo.sharedsecret.toHexString()}")
-        println ("  Shared-secret buffer is: ${bo.sharedsecret.toHexString()}")
+    }
 
-        println("")
-        println("Test 2: Low-numbered keys:")
-
-        val lowPubKeyAddr = zkconfig.decodePublicKey("02000000000000000000000000000000000000000000000000000000000000879e")
-        val lowKeyPairOTK = zkconfig.generateKeyPair(BigInteger("1"))
-        val TEST = (lowPubKeyAddr as BCECPublicKey).q as org.bouncycastle.math.ec.ECPoint
-
-        var bo2 = BlindOutput(zkconfig, lowKeyPairOTK.public, lowPubKeyAddr, lowKeyPairOTK.private, false)
-        println ("  Shared-secret buffer is: ${bo2.sharedsecret.toHexString()}")
-        println ("  Tx Address is: ${bo2.outputPublicKey.toString()}")
-
-        println("Boo yeea!")
-        println("")
-        println("OK, New Stuff!")
-        println("")
+    @JvmStatic
+    fun TestPrefixBase58Check() {
 
         var SA = StealthAddress()
         var SA2 = StealthAddress()
         var SA3 = StealthAddress()
-
-        println("${SA.verboseDescription()}")
-        println("${SA}")
-
-        val OTK = ECKey()
-        println("\nOTK: ${OTK}")
-        println("Shared X:      ${SA.getSharedXCoord(OTK).toHexString()}")
-        println("Shared Secret: ${SA.getSharedSecret(OTK).toHexString()}")
 
         println("\nPrefixBase58Check test:\n")
         println("D = \"\":                 ${PrefixBase58Check("BTS.")}")
@@ -181,7 +181,6 @@ object TestSuite {
         println("D = 0x0488B21E00...00:    ${PrefixBase58Check("BTS.", Hex.decode("0488B21E") + ByteArray(74, {0}))}")
 
     }
-
 
     /*  **************************************
      *  HELPER FUNCTIONS FOLLOW:
