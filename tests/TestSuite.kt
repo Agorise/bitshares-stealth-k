@@ -15,7 +15,8 @@ object TestSuite {
         //TestBlindCommitment()
         //TestPointNegation()
         //TestECKeyPairGeneration()
-        //TestPrefixBase58Check()
+        Test_PrefixBase58Check_Encoding()
+        Test_PrefixBase58Check_Decoding()
 
         var SA = StealthAddress()
 
@@ -134,25 +135,13 @@ object TestSuite {
     }
 
     @JvmStatic
-    fun TestPrefixBase58Check() {
-
-        var SA = StealthAddress()
-        var SA2 = StealthAddress()
-        var SA3 = StealthAddress()
-
-        println("\nPrefixBase58Check test:\n")
+    fun Test_PrefixBase58Check_Encoding() {
+        println("")
+        println("=======================================")
+        println("** PrefixBase58Check: Encoding Test: **")
+        println("=======================================")
+        println("*\n* Encoding Simple Byte Sequences:\n*")
         println("D = \"\":                 ${PrefixBase58Check("BTS.")}")
-        println("D = [Pub1][Pub2]:       ${PrefixBase58Check("BTS.", SA.viewKey.pubKey + SA.spendKey.pubKey)}")
-        println("D = [Pub2][Pub2]:       ${PrefixBase58Check("BTS.", SA.spendKey.pubKey + SA.spendKey.pubKey)}")
-        println("D = [Pub2][Pub1]:       ${PrefixBase58Check("BTS.", SA.spendKey.pubKey + SA.viewKey.pubKey)}")
-        println("D = [Pub2][Pub3]:       ${PrefixBase58Check("BTS.", SA.spendKey.pubKey + SA2.spendKey.pubKey)}")
-        println("D = [Pub2][Pub4]:       ${PrefixBase58Check("BTS.", SA.spendKey.pubKey + SA2.viewKey.pubKey)}")
-        println("D = [Pub1]:             ${PrefixBase58Check("BTS.", SA.viewKey.pubKey)}")
-        println("D = [Pub2]:             ${PrefixBase58Check("BTS.", SA.spendKey.pubKey)}")
-        println("D = [Pub3]:             ${PrefixBase58Check("BTS.", SA2.viewKey.pubKey)}")
-        println("D = [Pub4]:             ${PrefixBase58Check("BTS.", SA2.spendKey.pubKey)}")
-        println("D = [Pub5]:             ${PrefixBase58Check("BTS.", SA3.viewKey.pubKey)}")
-        println("D = [Pub6]:             ${PrefixBase58Check("BTS.", SA3.spendKey.pubKey)}")
         println("D = 0x00:               ${PrefixBase58Check("BTS.", ByteArray(1, {0}))}")
         println("D = 0x0000:             ${PrefixBase58Check("BTS.", ByteArray(2, {0}))}")
         println("D = 0x000000:           ${PrefixBase58Check("BTS.", ByteArray(3, {0}))}")
@@ -179,8 +168,84 @@ object TestSuite {
         println("D = 0x0488B21E00...00:    ${PrefixBase58Check("BTS.", Hex.decode("0488B21E") + ByteArray(8, {0}))}")
         println("D = 0x0488B21E00...00:    ${PrefixBase58Check("BTS.", Hex.decode("0488B21E") + ByteArray(16, {0}))}")
         println("D = 0x0488B21E00...00:    ${PrefixBase58Check("BTS.", Hex.decode("0488B21E") + ByteArray(74, {0}))}")
+        var SA = StealthAddress()   //
+        var SA2 = StealthAddress()  // Generating addresses just to get the keys...
+        var SA3 = StealthAddress()  //
+        println("*")
+        println("* Encoding Public Keys:\n*")
+        println("D = [Pub1][Pub2]:       ${PrefixBase58Check("BTS.", SA.viewKey.pubKey + SA.spendKey.pubKey)}")
+        println("D = [Pub2][Pub2]:       ${PrefixBase58Check("BTS.", SA.spendKey.pubKey + SA.spendKey.pubKey)}")
+        println("D = [Pub2][Pub1]:       ${PrefixBase58Check("BTS.", SA.spendKey.pubKey + SA.viewKey.pubKey)}")
+        println("D = [Pub2][Pub3]:       ${PrefixBase58Check("BTS.", SA.spendKey.pubKey + SA2.spendKey.pubKey)}")
+        println("D = [Pub2][Pub4]:       ${PrefixBase58Check("BTS.", SA.spendKey.pubKey + SA2.viewKey.pubKey)}")
+        println("D = [Pub1]:             ${PrefixBase58Check("BTS.", SA.viewKey.pubKey)}")
+        println("D = [Pub2]:             ${PrefixBase58Check("BTS.", SA.spendKey.pubKey)}")
+        println("D = [Pub3]:             ${PrefixBase58Check("BTS.", SA2.viewKey.pubKey)}")
+        println("D = [Pub4]:             ${PrefixBase58Check("BTS.", SA2.spendKey.pubKey)}")
+        println("D = [Pub5]:             ${PrefixBase58Check("BTS.", SA3.viewKey.pubKey)}")
+        println("D = [Pub6]:             ${PrefixBase58Check("BTS.", SA3.spendKey.pubKey)}")
+        println("*\n* Concludes Test_PrefixBase58Check_Encoding.\n*\n")
+    }
+
+    @JvmStatic
+    fun Test_PrefixBase58Check_Decoding() {
+        println("")
+        println("=======================================")
+        println("** PrefixBase58Check: Decoding Test: **")
+        println("=======================================")
+
+        fun Do_Test(inpStr : String, shouldPfx : String, shouldPayloadHex : String) : Unit {
+            try {
+                val PB = PrefixBase58Check.fromString(inpStr)
+                val prefix = PB.prefix
+                val payloadHex = PB.payload.toHexString()
+                val testResult = if(prefix.contentEquals(shouldPfx) && payloadHex.contentEquals(shouldPayloadHex))
+                                 {"PASS"} else {"FAIL"}
+                println("${testResult}: For input: ${inpStr.padEnd(20,' ')} Prefix is: ${prefix.padEnd(4,' ')} Payload is ${payloadHex}") }
+            catch (e: Throwable) {
+                println("FAIL: Input ${inpStr} resulted in unanticipated exception ${e}")
+            }
+        }
+        fun Do_Test_Except(inpStr : String, reason: String = "") {
+            try {
+                val PB = PrefixBase58Check.fromString(inpStr)
+                val reasonStr = if(reason.isNotBlank()) {" (${reason})"} else {""}
+                println("FAIL: Input '${inpStr}' did NOT result in expected exception.${reasonStr}") }
+            catch(e: Throwable) {
+                val reasonStr = if(reason.isNotBlank()) {" (${reason})"} else {""}
+                println("PASS: Input: ${("'"+inpStr+"'").padEnd(22,' ')} produced expected exception.${reasonStr}")
+            }
+        }
+
+        println("*\n* Decoding Simple Byte Sequences:\n*")
+
+        Do_Test("BTS4zNxKW", "BTS", "")
+        Do_Test("GRPH4zNxKW", "GRPH", "")
+        Do_Test("BTS11115BhVPG", "BTS", "00000000")
+        Do_Test("BTS111115BhVPG", "BTS1", "00000000")  // "Looks like" too many 1's but extra 1 interprets as prefix
+        Do_Test("GRPH11115BhVPG", "GRPH", "00000000")
+        Do_Test("BTSAjsziuRxrX", "BTS", "01010101")
+
+        Do_Test_Except("PrefixTooLong4zNxKW")
+        Do_Test_Except("BTS4zNxKWy", "Added extra char")
+        Do_Test_Except("BTS4zNxKX", "Changed char")
+        Do_Test_Except("prfx1111115BhVPG", "Too many leading ones")
+        Do_Test_Except("prfx111115BhVPG", "Too many leading ones")
+        Do_Test_Except("prfx1115BhVPG", "Too few leading ones")
+        Do_Test_Except(" BTSAjsziuRxrX", "Whitespace")
+        Do_Test_Except("BTS AjsziuRxrX", "Whitespace")
+        Do_Test_Except("BTSAjsziuRxrX ", "Whitespace")
+
+        println("*\n* Decoding Public Key Payloads:\n*")
+        Do_Test("BTS5WcAwQDaxCVDLYgUcBPHJJx8nxKquQCxRBsezN2DQnJ7Ha2VxU",
+                "BTS", "025202641a11502db19165dc6b4c2703f76a2016978cf9e4257db32bc435834f49")
+        Do_Test("BTS8UYgAf3C7yj2Sq5mrPtGNf4sKtS7spBsL1C5Pzj2zATTiC1Beh",
+                "BTS", "03d86b6558850e986fcd756e0e70b6d3c0dab426b7f2bab34bca99874201fa9f47")
+
+        println("*\n* Concludes Test_PrefixBase58Check_Decoding.\n*\n")
 
     }
+
 
     /*  **************************************
      *  HELPER FUNCTIONS FOLLOW:

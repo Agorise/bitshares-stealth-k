@@ -196,8 +196,8 @@ class StealthAddress(
 
     /**
      *  Returns an ECKey (public only) for authorization of a transaction output.  The key will be a child of
-     *  the stealth address keys and OTK, the one-time randomness key.  Either OTK or this.viewKey must contain
-     *  a private component, or an exception will be thrown.
+     *  the stealth address keys and OTK (the one-time randomness key), and will be compressed.
+     *  Either OTK or this.viewKey must contain a private component, or an exception will be thrown.
      */
     fun getTxAuthKey(OTK : ECKey) : ECKey {
         val secret = this.getSharedSecret(OTK)
@@ -205,7 +205,9 @@ class StealthAddress(
         val childIndex = md.digest(secret)
         val offset = getChildOffset(this.viewKey, childIndex)
         val offsetPoint = ECKey.fromPrivate(offset).pubKeyPoint
-        return ECKey.fromPublicOnly(this.spendKey.pubKeyPoint.add(offsetPoint))
+        val retVal = ECKey.fromPublicOnly(this.spendKey.pubKeyPoint.add(offsetPoint))
+        check(retVal.isCompressed)
+        return retVal
     }
 
     private fun getChildOffset(ParentKey : ECKey, indexdata : ByteArray) : BigInteger {
