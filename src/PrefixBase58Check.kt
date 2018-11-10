@@ -2,7 +2,7 @@ import org.bitcoinj.core.Base58
 import org.spongycastle.crypto.digests.RIPEMD160Digest
 
 /**
- *  Encodes (and decodes) data into (our out of) a Prefixed Base58 with Checksum string representation.
+ *  Encodes (and decodes) data into (or out of) a Prefixed Base58 with Checksum string representation.
  *  The prefix is a simple short character string.  The checksum is a truncated hash of the data payload,
  *  appended to the end of the payload before base58 encoding.
  *
@@ -25,7 +25,9 @@ class PrefixBase58Check(val prefix : String, val payload : ByteArray = ByteArray
 
 
     companion object {
+
         const val NUM_CHECK_BYTES = 4
+
         /**
          *  Decodes a PrefixBase58Check object from the given string.  Makes a few guesses at prefix length.
          *  (Currently tests for either a three char or four char prefix.)  Throws if cannot extract both a
@@ -34,6 +36,15 @@ class PrefixBase58Check(val prefix : String, val payload : ByteArray = ByteArray
         fun fromString(pb58str : String) : PrefixBase58Check {
             return try {fromStringAndPrefixLength(pb58str,3)}
                    catch(e: Throwable) {fromStringAndPrefixLength(pb58str, 4)}
+        }
+        /**
+         *  This version decodes a PrefixBase58Check object from the given string, with the expectation of
+         *  a specific prefix.  Will throw if the found prefix does not match the expected prefix.
+         */
+        fun fromString(pb58str : String, expectedPrefix : String) : PrefixBase58Check {
+            val ret = fromStringAndPrefixLength(pb58str,expectedPrefix.length)
+            require(expectedPrefix.contentEquals(ret.prefix))
+            return ret
         }
         /*  Decode string and return root object; throws if cannot extract prefix of given length or if
          *  checksum not present or doesn't match. */

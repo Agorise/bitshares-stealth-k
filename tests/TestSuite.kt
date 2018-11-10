@@ -1,5 +1,6 @@
 import org.bitcoinj.core.ECKey
 import org.bouncycastle.util.encoders.Hex
+import org.spongycastle.math.ec.ECPoint
 import java.math.BigInteger
 
 object TestSuite {
@@ -17,17 +18,8 @@ object TestSuite {
         //TestECKeyPairGeneration()
         Test_PrefixBase58Check_Encoding()
         Test_PrefixBase58Check_Decoding()
-
-        var SA = StealthAddress()
-
-        println("${SA.verboseDescription()}")
-        println("${SA}")
-
-        val OTK = ECKey()
-        println("\nOTK: ${OTK}")
-        println("Shared X:      ${SA.getSharedXCoord(OTK).toHexString()}")
-        println("Shared Secret: ${SA.getSharedSecret(OTK).toHexString()}")
-        println("Child PubKey:  ${SA.getTxAuthKey(OTK).pubKey.toHexString()}")
+        Test_StealthAddress_ProduceAndDecode()
+        //Test_StealthAddress_SharedSecrets()
 
     }
 
@@ -246,10 +238,61 @@ object TestSuite {
 
     }
 
+    @JvmStatic
+    fun Test_StealthAddress_ProduceAndDecode() {
+        println("")
+        println("=========================================")
+        println("** StealthAddress: Produce and Decode: **")
+        println("=========================================")
 
-    /*  **************************************
-     *  HELPER FUNCTIONS FOLLOW:
-     */
+        println("*\n* Produce New StealthAddress from Randomness:\n*")
+        val SA = StealthAddress()
+        println("${SA.verboseDescription()}")
+
+        println("*\n* Produce StealthAddresses from ECKeys and public key points:\n*")
+        val SA2 = StealthAddress(SA.spendKey.pubKeyPoint)
+        println("${SA2.verboseDescription()}")
+        val SA3 = StealthAddress(SA.viewKey.pubKeyPoint, SA.spendKey.pubKeyPoint)
+        println("${SA3.verboseDescription()}")
+        val SA4 = StealthAddress(SA.viewKey, SA.spendKey.pubKeyPoint)
+        println("${SA4.verboseDescription()}")
+
+        println("*\n* Decode StealthAddresses from address strings:\n*")
+        val SA5 = StealthAddress("BTS7WAmV9w9sBEcewmSN6XDJQiwCxDSLdrfkUaTd6Myhs6U38oDAL")
+        println("${SA5.verboseDescription()}")
+        val SA6 = StealthAddress("BTSBAyy4fqVtRyseqpPdD1iq9nwJtt12w3RNzsv2pTsT3KNFNVVsrPTjZjCEhCBmcyKgGo6Dk6YDZHx7RQGtK7rgNJDKHqAfNR")
+        println("${SA6.verboseDescription()}")
+
+        println("*\n* Concludes Test_StealthAddress_ProduceAndDecode.\n* //////\n")
+
+    }
+
+    @JvmStatic
+    fun Test_StealthAddress_SharedSecrets() {
+        println("")
+        println("=======================================")
+        println("** StealthAddress: Shared Secrets:   **")
+        println("=======================================")
+
+        var SA = StealthAddress()
+
+        println("${SA.verboseDescription()}")
+        println("${SA}")
+
+        val OTK = ECKey()
+        println("\nOTK: ${OTK}")
+        println("Shared X:      ${SA.getSharedXCoord(OTK).toHexString()}")
+        println("Shared Secret: ${SA.getSharedSecret(OTK).toHexString()}")
+        println("Child PubKey:  ${SA.getTxAuthKey(OTK).pubKey.toHexString()}")
+
+        println("*\n* Concludes Test_StealthAddress_SharedSecrets.\n*\n")
+
+    }
+
+
+        /*  **************************************
+         *  HELPER FUNCTIONS FOLLOW:
+         */
 
     @JvmStatic
     fun TestBlindCommit(blind: BigInteger, values: Array<BigInteger>, label: String) {

@@ -1,4 +1,5 @@
-import org.bitcoinj.core.ECKey;
+import org.bitcoinj.core.ECKey
+import org.spongycastle.math.ec.ECPoint
 import java.math.BigInteger
 import java.security.MessageDigest
 
@@ -126,15 +127,66 @@ class StealthAddress(
         val prefix : String = "BTS")
 {
 
-    constructor() : this(ECKey(), ECKey(), true) {
-        println("SA empty constructor")
+    companion object {
+
+        const val NUM_CPUBKEY_BYTES = 33
+
+        /**
+         *  Extract the prefix and ONE or TWO public keys from an address string and return a StealthAddress
+         *  generated therefrom.
+         */
+        fun fromString(address : String) : StealthAddress {
+            val decoded = PrefixBase58Check.fromString(address)
+            require(decoded.payload.size >= NUM_CPUBKEY_BYTES)
+            require(decoded.payload.size.rem(NUM_CPUBKEY_BYTES) == 0)
+            val numKeys = decoded.payload.size.div(NUM_CPUBKEY_BYTES)
+            require(numKeys == 1 || numKeys == 2)
+            val Key1 = ECKey.fromPublicOnly(decoded.payload.sliceArray(0..NUM_CPUBKEY_BYTES-1))
+            if (numKeys == 1) {
+                return StealthAddress(Key1, Key1, false)
+            }
+            else {
+                val Key2 = ECKey.fromPublicOnly(decoded.payload.sliceArray(NUM_CPUBKEY_BYTES..(2*NUM_CPUBKEY_BYTES-1)))
+                return StealthAddress(Key1, Key2, true, decoded.prefix)
+            }
+        }
     }
+
+    /**
+     *  CONSTRUCTORS:
+     *   1) Produce a new StealthAddress from randomness.  New object will possess private keys for both
+     *      scanning and spending */
+    constructor() : this(ECKey(), ECKey(), true)
+    /*  More constructors follow:
+     *   2) Single-key address, public-only, from ECPoint
+     *   3) Dual-key address, public-only, from ECPoints
+     *   4) Watching address, public-only for spend, can have private for viewKey
+     *   5) Copy constructor
+     *   6) Decode from address string
+     */
+    constructor(pubKeyPoint : ECPoint, prefix : String = "BTS")
+            : this(ECKey.fromPublicOnly(pubKeyPoint),ECKey(), false, prefix)
+    constructor(viewKeyPoint : ECPoint, spendKeyPoint: ECPoint, prefix : String = "BTS")
+            : this(ECKey.fromPublicOnly(viewKeyPoint),ECKey.fromPublicOnly(spendKeyPoint), true, prefix)
+    constructor(viewKey : ECKey, spendKeyPoint: ECPoint, prefix : String = "BTS")
+            : this(viewKey, ECKey.fromPublicOnly(spendKeyPoint), true, prefix)
+    constructor(orig : StealthAddress)
+            : this(orig._ViewKey, orig._SpendKey, orig.separateSpendKey, orig.prefix)
+    constructor(address : String)
+            : this(fromString(address))
+
+    /**
+     *  PROPERTIES:
+     */
 
     val viewKey : ECKey
         get() {return _ViewKey}
     val spendKey : ECKey
         get() {return if (separateSpendKey) _SpendKey else _ViewKey}
-
+    val canScan : Boolean
+        get() {return viewKey.hasPrivKey()}
+    val canSpend : Boolean
+        get() {return spendKey.hasPrivKey()}
 
     /** Get String representation of the Address.
      */
@@ -157,9 +209,9 @@ class StealthAddress(
 
     fun verboseDescription() : String {
         val builder = StringBuilder()
-        builder.append("Stealth Address: ${this}\n\n")
-        builder.append("  ViewKey:  ${this.viewKey.publicKeyAsHex}\n")
-        builder.append("  SpendKey: ${this.spendKey.publicKeyAsHex}\n")
+        builder.append("StealthAddress: ${this}\n")
+        builder.append("       ViewKey: ${this.viewKey.publicKeyAsHex}  hasPrivKey: ${if(canScan){"Yes"}else{"No"}}\n")
+        builder.append("      SpendKey: ${this.spendKey.publicKeyAsHex}  hasPrivKey: ${if(canSpend){"Yes"}else{"No"}}")
         return builder.toString()
     }
 
