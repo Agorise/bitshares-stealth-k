@@ -121,8 +121,8 @@ import java.security.MessageDigest
  */
 
 class StealthAddress(
-        val _ViewKey : ECKey,
-        val _SpendKey : ECKey,
+        private val _ViewKey : ECKey,
+        private val _SpendKey : ECKey,
         val separateSpendKey : Boolean,
         val prefix : String = "BTS")
 {
@@ -190,16 +190,19 @@ class StealthAddress(
 
     /** Get String representation of the Address.
      */
-    override fun toString(): String {
+    override fun toString(): String {return address}
+    val address : String get() {return addressString()}
+
+    private fun addressString() : String {
         if (_addressString.isEmpty()) {
             _addressString = this.getAsPrefixedBase58CheckString()
         }
         return _addressString
     }
-    var _addressString : String = ""
+    private var _addressString : String = ""
 
-    /* This is a back-end to the toString() method. */
-    fun getAsPrefixedBase58CheckString() : String {
+    /* This is a back-end to the addressString() method. */
+    private fun getAsPrefixedBase58CheckString() : String {
         var keycat : ByteArray = this.viewKey.pubKey
         if (separateSpendKey) {
             keycat += this.spendKey.pubKey
@@ -273,6 +276,15 @@ class StealthAddress(
         val digest = md.digest(message)
         check(digest.size == md.digestLength)
         return BigInteger(digest)
+    }
+
+    /**
+     *  Checks a (OTK, TxAuthKey) pair to see if it derives from this StealthAddress.  Either OTK or this.viewKey
+     *  must have private component or else an exception is relayed.
+     */
+    fun recognizeTxAuthKey(OTK : ECKey, TxAuthKey : ECKey) : Boolean {
+        val trialTxAKBytes = getTxAuthKey(OTK).pubKey
+        return trialTxAKBytes.contentEquals(TxAuthKey.pubKey)
     }
 
 }

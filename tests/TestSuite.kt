@@ -19,7 +19,7 @@ object TestSuite {
         Test_PrefixBase58Check_Encoding()
         Test_PrefixBase58Check_Decoding()
         Test_StealthAddress_ProduceAndDecode()
-        //Test_StealthAddress_SharedSecrets()
+        Test_StealthAddress_SendAndReceive()
 
     }
 
@@ -289,6 +289,70 @@ object TestSuite {
 
     }
 
+    @JvmStatic
+    fun Test_StealthAddress_SendAndReceive() {
+        println("")
+        println("========================================")
+        println("** StealthAddress: Send and Receive:  **")
+        println("========================================")
+
+        val SA_Bob_with_Priv = StealthAddress()
+        val Bob_address = SA_Bob_with_Priv.address
+        val SA_Bob = StealthAddress(Bob_address)
+
+        println("*\n*  Bob publishes a Stealth Address to his social media site:\n*")
+        println("*    Bob Address:  ${Bob_address}\n*")
+        println("*  Bob's address encodes a public ViewKey and public SpendKey:\n*")
+        println("*        ViewKey:  ${SA_Bob.viewKey.publicKeyAsHex}")
+        println("*       SpendKey:  ${SA_Bob.spendKey.publicKeyAsHex}\n*")
+
+
+        println("*\n*  Alice wishes to send a balance to Bob.  Alice generates one-time randomness key OTK:\n*")
+
+        val OTK = ECKey()
+        val OTK_string = PrefixBase58Check("OTK", OTK.pubKey)
+
+        println("*            OTK:  ${OTK_string},")
+        println("*                  (${OTK.publicKeyAsHex})\n*")
+        println("*  for which she possesses private key: ${OTK.privateKeyAsHex}.\n*")
+
+        val TxAuthKeyPub = StealthAddress(Bob_address).getTxAuthKey(OTK)
+        val TxAuth_string = PrefixBase58Check("BTS",TxAuthKeyPub.pubKey)
+
+        println("*  With the OTK private key, Alice is able to generate TxAuthKey as a child between OTK and Bob's address.\n*")
+        println("*      TxAuthKey:  ${TxAuth_string}")
+        println("*                  (${TxAuthKeyPub.publicKeyAsHex})\n*")
+        println("*  She publishes her transaction to the network, including (OTK, TxAuthKey) in the metadata.")
+        println("*  Two other players publish unrelated transactions in the same time window, such that Bob's")
+        println("*  wallet observes the following transaction metadata packets on the network:\n*")
+
+        val Herring1_OTK = ECKey()
+        val Herring1_TAK = ECKey()
+        val Herring2_OTK = ECKey()
+        val Herring2_TAK = ECKey()
+
+        println("*   1. (${OTK_string}, ${TxAuth_string})")
+        println("*   2. (${PrefixBase58Check("OTK",Herring1_OTK.pubKey)}, ${PrefixBase58Check("BTS",Herring1_TAK.pubKey)})")
+        println("*   3. (${PrefixBase58Check("OTK",Herring2_OTK.pubKey)}, ${PrefixBase58Check("BTS",Herring2_TAK.pubKey)})")
+        println("*")
+
+        println("*  Bob checks each (OTK,TxAuthKey) pair to see if his address generates the same TxAuthKey from")
+        println("*  the OTK, and succeeds in recognizing the one from Alice.\n*")
+
+        fun MatchOrNoMatch(otk : ECKey, txakey : ECKey) : String {
+            return if(SA_Bob_with_Priv.recognizeTxAuthKey(otk, txakey))
+            {"Match! Incoming funds recognized!"} else
+            {"not recognized"}
+        }
+
+        println("*   1. ${MatchOrNoMatch(OTK, TxAuthKeyPub)}")
+        println("*   2. ${MatchOrNoMatch(Herring1_OTK, Herring1_TAK)}")
+        println("*   3. ${MatchOrNoMatch(Herring2_OTK, Herring2_TAK)}")
+
+        println("*\n* CONCLUDES: Test_StealthAddress_SendAndReceive")
+        println("* ////////\n")
+
+    }
 
         /*  **************************************
          *  HELPER FUNCTIONS FOLLOW:
