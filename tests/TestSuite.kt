@@ -20,7 +20,7 @@ object TestSuite {
         Test_PrefixBase58Check_Decoding()
         Demos.StealthAddress_ProduceAndDecode()
         Demos.StealthAddress_SendAndReceive()
-        Benchmarks.ScanningForTransactions(20, 20)
+        Benchmarks.ScanningForTransactions()
 
     }
 
